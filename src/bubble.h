@@ -68,18 +68,19 @@ typedef struct shooter {
     uint8_t flags; // NULL,NULL,NULL,NULL,NULL,NULL,Deactivate shooter?,Active projectile?
 } shooter_t;
 
+char * uint8_to_bin(uint8_t n);
 bubble_t newBubble(uint8_t x,uint8_t y,uint8_t color,uint8_t flags);
 void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);
-void init_grid(grid_t * grid);
+void init_grid(grid_t * grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start);
 void renderGrid(grid_t * grid);
 void renderShooter(shooter_t * shooter);
 bool collide(double x1,double y1,double x2,double y2,uint8_t r);
 void snapBubble(projectile_t * projectile,grid_t * grid);
-#undef gfx_PrintIntXY
 void move_proj(grid_t * grid,shooter_t * shooter,uint8_t dt);
 void resetProcessed(grid_t * grid);
 bubble_list_t * getNeighbors(grid_t * grid,bubble_t tile);
 bubble_list_t * findCluster(grid_t * grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
 bubble_list_t * findFloatingClusters(grid_t * grid);
+#undef gfx_PrintIntXY
