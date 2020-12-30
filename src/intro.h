@@ -1,3 +1,3 @@
-#ifndef __INTRO_H__
-#define __INTRO_H__
+#ifndef INTRO_H
+#define INTRO_H
 #endif
