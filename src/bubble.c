@@ -18,22 +18,17 @@
 //shooter
 #define ACTIVE_PROJ (1<<0)
 #define DEACTIVATED (1<<1)
-#define gfx_PrintIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
-gfx_PrintInt(i,length)
 
-#define debug_message(message) \
-gfx_PrintStringXY(message,0,116); \
-gfx_BlitBuffer(); \
-while (!os_GetCSC())
 /*Globals*/
 uint8_t row_offset; // 0: even row; 1: odd row
 int array_size; //holds foundclusters_size
+bool debug_flag;
 //enum gamestate current_gamestate;
 enum gamestate{
     game_over = 0,
     neutral = 1,
     shoot = 2,
-    pop = 3
+    pop = 3,
 };
 gfx_sprite_t * bubble_sprites[7] = {
     bubble_red,
@@ -92,18 +87,14 @@ point_t getTileCoordinate(int col,int row) {
 }
 point_t getGridPosition(int x,int y) {
     point_t temp;
-    uint8_t xoffset = 0;
     temp.y = y / ROW_HEIGHT;
-    if ((y + row_offset) % 2)
-        xoffset = TILE_WIDTH >> 1;
-    temp.x = (x - xoffset) / TILE_WIDTH;
+    temp.x = (x - (((temp.y + row_offset) % 2) ? TILE_WIDTH >> 1 : 0)) / TILE_WIDTH;
     return temp;
 }
 void init_grid(grid_t * grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start) {
     /*example: init_grid(grid,16,7,15) for a 16*7 grid with 2 empty rows at the bottom.*/
     uint8_t i,j,r;
     point_t p = {0, 0};//getGridPosition(grid->x,grid->y);
-//    int grid_size = grid->cols*grid->rows;
     r = 0;
     if (empty_row_start == 0) empty_row_start = 1;
     for (i=0;i<rows;i++) {
@@ -111,12 +102,8 @@ void init_grid(grid_t * grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start) 
             if (i >= empty_row_start-1) {
                 grid->bubbles[(i*cols)+j] = newBubble(j,i,0,EMPTY);
             } else {
-                if (randInt(0,1)) {
-                    r = randInt(0,6);
-                    grid->bubbles[(i*cols)+j] = newBubble(j,i,r,0);
-                } else {
-                    grid->bubbles[(i*cols)+j] = newBubble(j,i,0,EMPTY);
-                }
+                r = randInt(0,6);
+                grid->bubbles[(i*cols)+j] = newBubble(j,i,r,0);
             }
         }
     }
@@ -133,7 +120,6 @@ void renderGrid(grid_t * grid) {
             coord = getTileCoordinate(j,i);
             coord.x += grid->x;
             coord.y += grid->y;
-            //gfx_Rectangle(coord.x,coord.y,16,16);
             drawTile(tile.color,coord.x,coord.y);
         }
     }
@@ -145,19 +131,12 @@ void renderShooter(shooter_t * shooter) {
     gfx_palette[shooter->pal_index] = gfx_Darken(bubble_colors[shooter->next_bubbles[0]],255&(rtc_Time()%3));
     gfx_SetColor(shooter->pal_index);
     //gfx_FillCircle(center.x,center.y,TILE_WIDTH>>1);
-    gfx_Line(center.x,center.y,center.x + ((double)1.5 * TILE_WIDTH) * sin(rad((double)shooter->angle)),center.y - ((double)1.5 * TILE_HEIGHT) * cos(rad((double)shooter->angle)));
+    gfx_Line(center.x,center.y,center.x + ((float)1.5 * TILE_WIDTH) * sin(rad((float)shooter->angle)),center.y - ((float)1.5 * TILE_HEIGHT) * cos(rad((float)shooter->angle)));
     //gfx_palette[shooter->pal_index] = bubble_colors[shooter->next_bubbles[0]];
     gfx_TransparentSprite(bubble_sprites[shooter->next_bubbles[0]],shooter->x,shooter->y);
 }
-/*bool collide(x1,y1,r1,x2,y2,r2) {
+bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
     float dx,dy,dist;
-    dx = x2 - x1;
-    dy = y2 - y1;
-    dist = sqrt((dx*dx) + (dy+dy));
-    return (dist < r1+r2);
-}*/
-bool collide(double x1,double y1,double x2,double y2,uint8_t r) {
-    double dx,dy,dist;
     dx = x2 - x1;
     dy = y2 - y1;
     dist = sqrt((dx*dx) + (dy*dy));
@@ -168,14 +147,15 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
     uint8_t i;
     int index;
     bubble_list_t * cluster;
-    point_t gridpos = getGridPosition(((int)projectile->x) + (TILE_WIDTH>>1) - grid->x,((int)projectile->y) + (TILE_HEIGHT>>1) - grid->y);
+    point_t gridpos,test;
+    gridpos = getGridPosition(projectile->x + (TILE_WIDTH>>1) - grid->x,projectile->y + (TILE_HEIGHT>>1) - grid->y);
     addtile = false;
     //if gridpos is outside of the grid, force it in.
     if (gridpos.x < 0) {
         gridpos.x = 0;
     }
     if (gridpos.x >= grid->cols) {
-        gridpos.x = 0;
+        gridpos.x = grid->cols-1;
     }
     if (gridpos.y < 0) {
         gridpos.y = 0;
@@ -183,14 +163,7 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
     if (gridpos.y >= grid->rows) {
         gridpos.y = grid->rows - 1;
     }
-    //gfx_PrintIntXY(gridpos.x,3,0,48);
-    //gfx_PrintIntXY(gridpos.y,3,32,48);
-    //gfx_PrintIntXY(projectile->x,3,0,60);
-    //gfx_PrintIntXY(projectile->y,3,32,60);
-    //gfx_BlitBuffer();
-    //while(!os_GetCSC());
-    index = gridpos.y * grid->cols + gridpos.x;
-    if (!(grid->bubbles[index].flags & EMPTY)) {
+    if (!(grid->bubbles[gridpos.y * grid->cols + gridpos.x].flags & EMPTY)) {
         for (i = gridpos.y+1;i < grid->rows; i++) {
             if ((grid->bubbles[i*grid->cols + gridpos.x].flags) & EMPTY) {
                 gridpos.y = i;
@@ -203,24 +176,6 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
     }
     if (addtile) {
         index = gridpos.y * grid->cols + gridpos.x;
-/*        gfx_FillScreen(255);
-        gfx_PrintStringXY("index",0,0);
-        gfx_PrintIntXY(index,4,0,8);
-        gfx_PrintStringXY("gridpos x/y, gridpos index",0,16);
-        gfx_PrintIntXY(gridpos.x,4,0,24);
-        gfx_PrintIntXY(gridpos.y,4,40,24);
-        gfx_PrintIntXY(gridpos.y*grid->cols + gridpos.x,4,80,24);
-        gfx_PrintStringXY("bubble x/y, color, flags",0,32);
-        gfx_PrintIntXY(grid->bubbles[index].x,4,0,40);
-        gfx_PrintIntXY(grid->bubbles[index].y,4,40,40);
-        gfx_PrintIntXY(grid->bubbles[index].color,4,80,40);
-        gfx_PrintIntXY(grid->bubbles[index].flags,4,120,40);
-        gfx_SetTextScale(1,2);
-        gfx_PrintStringXY("EMPTY = 4",0,48);
-        gfx_SetTextScale(1,1);
-        gfx_BlitBuffer();
-        while(!os_GetCSC());
-        gfx_FillScreen(255);*/
         if (!(grid->bubbles[index].flags & EMPTY)) exit(1); //not empty, exit
         grid->bubbles[index].flags &= ~EMPTY;
         grid->bubbles[index].color = projectile->color;
@@ -232,13 +187,13 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
         }*/
     }
 }
-void move_proj(grid_t * grid,shooter_t * shooter,uint8_t dt) {
+void move_proj(grid_t * grid,shooter_t * shooter,float dt) {
     uint8_t i,j;
-    char * c;
+    //char * c;
     int index; // may turn this into a uint8_t later.
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = shooter->projectile;
-    c = malloc(9);
+    //c = malloc(9);
     projectile->x += dt * projectile->speed * sin(rad(projectile->angle));
     projectile->y -= dt * projectile->speed * cos(rad(projectile->angle));
     proj_coord.x = (int) projectile->x;
@@ -253,13 +208,14 @@ void move_proj(grid_t * grid,shooter_t * shooter,uint8_t dt) {
         projectile->x = (float) proj_coord.x;
     }
     if (proj_coord.y <= grid->y) {
-        projectile->y = (float) grid->y;
+        projectile->y = grid->y;
         snapBubble(projectile,grid);
         shooter->flags &= ~(ACTIVE_PROJ);
+        //debug_message("Touched top");
         return;
     }
     proj_coord.x -= grid->x;
-    //proj_coord.y -= grid->y; //0
+    //proj_coord.y -= grid->y; //does nothing for now.
     if (proj_coord.x > grid->width || proj_coord.y > grid->height) {
         return;
     }
@@ -270,20 +226,11 @@ void move_proj(grid_t * grid,shooter_t * shooter,uint8_t dt) {
                 continue;
             }
             coord = getTileCoordinate(j, i);
-            if (collide(proj_coord.x,
-                        proj_coord.y,
-                        coord.x,
-                        coord.y,
+            if (collide(proj_coord.x + TILE_WIDTH>>1,
+                        proj_coord.y + TILE_HEIGHT>>1,
+                        coord.x + TILE_WIDTH>>1,
+                        coord.y + TILE_HEIGHT>>1,
                         grid->ball_radius)) {
-//                gfx_PrintIntXY(coord.x,4,0,0);
-//                gfx_PrintIntXY(coord.y,4,40,0);
-//                gfx_PrintIntXY(proj_coord.x,4,0,8);
-//                gfx_PrintIntXY(proj_coord.y,4,40,8);
-//                gfx_PrintIntXY(index,4,0,16);
-//                gfx_PrintStringXY(uint8_to_bin(grid->bubbles[index].flags),0,32);
-//                gfx_BlitBuffer();
-//                while(!os_GetCSC());
-//                gfx_FillScreen(255);
                 snapBubble(projectile,grid);
                 shooter->flags &= ~(ACTIVE_PROJ);
                 return;
@@ -303,6 +250,7 @@ bubble_list_t * getNeighbors(grid_t * grid,bubble_t tile) {
     bubble_list_t * neighbors;
     int8_t **this_row_offsets;
     int8_t tilerow = (tile.y + row_offset) % 2; // Even or odd row
+    neighbors = (bubble_list_t *) malloc(sizeof(bubble_list_t));
     neighbors->size = 0;
     neighbors->bubbles = (bubble_t *) malloc(sizeof(bubble_t));
     // Get the neighbor offsets for the specified tile
@@ -386,6 +334,7 @@ bubble_list_t * findFloatingClusters(grid_t * grid) {
     bubble_t tile;
     resetProcessed(grid);
     foundclusters = (bubble_list_t *) malloc(sizeof(bubble_list_t));
+    foundclusters_size = 0;
     for (i = 0;i < grid->rows;i++) {
         for (j = 0;j < grid->cols; j++) {
             tile = grid->bubbles[(i * grid->cols) + j];
@@ -410,4 +359,3 @@ bubble_list_t * findFloatingClusters(grid_t * grid) {
     array_size = foundclusters_size;
     return foundclusters;
 }
-#undef gfx_PrintIntXY
