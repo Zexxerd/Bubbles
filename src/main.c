@@ -4,7 +4,6 @@
 
 /* Keep these headers */
 #include <tice.h>
-//matrix(x,y) = matrix((y * matrix_cols) + x)
 
 /* Standard headers - it's recommended to leave them included */
 #include <math.h>
@@ -18,19 +17,28 @@
 #include "bubble.h"
 #include "gfx/bubble.h"
 
+//matrix(x,y) = matrix((y * matrix_cols) + x)
+
 #ifndef TILE_WIDTH
 #define TILE_WIDTH 16
 #endif
 #ifndef TILE_HEIGHT
 #define TILE_HEIGHT 16
 #endif
-#define LBOUND -84
-#define RBOUND 84
+#define LBOUND -64
+#define RBOUND 64
+/*Debug Macros*/
+#ifndef gfx_PrintUIntXY
 #define gfx_PrintUIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
 gfx_PrintUInt(i,length)
+#endif
+#ifndef gfx_PrintIntXY
 #define gfx_PrintIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
 gfx_PrintInt(i,length)
+#endif
+
 extern uint8_t row_offset;
+extern bool debug_flag;
 extern gfx_sprite_t * bubble_sprites[7];
 extern const uint16_t bubble_colors[7];
 //extern enum gamestate;
@@ -45,12 +53,13 @@ char * printfloat(float elapsed) {
 void main(void) {
     int x,y,i;
     uint8_t fps_counter;
-    float fps,seconds;
-    char c[21];
+    float fps,ticks;
+    //char debug_string[21];
     char * fps_string;
     point_t point;
     shooter_t * shooter;
     grid_t * grid;
+    fps = 0;
     fps_string = malloc(15);
     shooter = (shooter_t *) malloc(sizeof(shooter_t));
     shooter->x = 160 - (TILE_WIDTH>>1);
@@ -68,45 +77,17 @@ void main(void) {
     grid->rows = 16;
     grid->width = (TILE_WIDTH * grid->cols) + (TILE_WIDTH>>1);
     grid->height = ROW_HEIGHT * grid->rows + (TILE_WIDTH>>2);
-    grid->bubbles = (bubble_t *) malloc((grid->cols*grid->rows) * sizeof(bubble_t)); //4*112 = 448
+    grid->bubbles = (bubble_t *) malloc((grid->cols*grid->rows) * sizeof(bubble_t));
     if (grid->bubbles == NULL) exit(1);
     srand(rtc_Time());
-    init_grid(grid,16,7,15);
+    init_grid(grid,grid->rows,grid->cols,10);
     gfx_palette[255] = 0xFFFF;
     gfx_Begin();
     gfx_SetDrawBuffer();
     gfx_SetPalette(bubble_pal,78,0);
     row_offset = 0;
-    x = y = 0;
+    //x = y = 0;
     strcpy(fps_string,"FPS: ");
-/*    for (i=0;i<grid->rows*grid->cols;i++) {
-        gfx_FillScreen(255);
-        gfx_PrintStringXY("col/row",72,0);
-        gfx_PrintStringXY("Index color",72,8);
-        gfx_PrintStringXY("Index flags (4=EMPTY,not 0 = ERROR)",72,16);
-        gfx_PrintStringXY("Index",72,24);
-        gfx_PrintStringXY("MAX_COLOR",72,32);
-        gfx_PrintStringXY("Grid address",72,40);
-        gfx_PrintStringXY("Bubbles address",72,48);
-        sprintf(c,"(%i,%i)",grid->bubbles[i].x,grid->bubbles[i].y);
-        gfx_PrintStringXY(c,0,0);
-        gfx_PrintUIntXY(grid->bubbles[i].color,8,0,8);
-        gfx_PrintUIntXY(grid->bubbles[i].flags,8,0,16);
-        gfx_PrintUIntXY(i,3,0,24);
-        gfx_PrintUIntXY(MAX_COLOR,3,0,32);
-        sprintf(c,"%p",grid);
-        gfx_PrintStringXY(c,0,40);
-        sprintf(c,"%p",grid->bubbles);
-        gfx_PrintStringXY(c,0,48);
-        gfx_BlitBuffer();
-        while(!os_GetCSC());
-        kb_Scan();
-        if (kb_Data[6] & kb_Clear) {
-            break;
-        }
-    }
-    gfx_End();
-    exit(1);*/
     fps_counter = 0;
     timer_Control = TIMER1_DISABLE;
     timer_1_Counter = 0;
@@ -115,23 +96,23 @@ void main(void) {
         kb_Scan();
         gfx_FillScreen(255);
         if (kb_Data[7] & kb_Left) {
-            x--;
+//            x--;
             if (shooter->angle > LBOUND)
                 shooter->angle-=4;
         }
         if (kb_Data[7] & kb_Right) {
-            x++;
+//            x++;
             if (shooter->angle < RBOUND)
                 shooter->angle+=4;
         }
         if (kb_Data[7] & kb_Up)
-            y--;
+//            y--;
         if (kb_Data[7] & kb_Down)
-            y++;
+//            y++;
         if (kb_Data[2] & kb_Alpha)
             row_offset ^= 1;
-        if (kb_Data[1] & kb_2nd) { //shoot the projectile
-            if (!(shooter->flags & ACTIVE_PROJ)) { //if one isn't active, shoot
+        if (kb_Data[1] & kb_2nd) {
+            if (!(shooter->flags & ACTIVE_PROJ)) {
                 shooter->projectile->x = shooter->x;
                 shooter->projectile->y = shooter->y;
                 shooter->projectile->angle = shooter->angle;
@@ -139,35 +120,23 @@ void main(void) {
                 shooter->next_bubbles[0] = shooter->next_bubbles[1];
                 shooter->next_bubbles[1] = shooter->next_bubbles[2];
                 shooter->next_bubbles[2] = randInt(0, MAX_COLOR);
-                //memcpy((void *)shooter->next_bubbles,((void *)shooter->next_bubbles) + 1, 2);
                 shooter->flags |= ACTIVE_PROJ;
             }
         }
         if (shooter->flags & ACTIVE_PROJ) {
-            move_proj(grid,shooter,1);
-            gfx_PrintIntXY(shooter->projectile->x,3,0,24);
-            gfx_PrintIntXY(shooter->projectile->y,3,32,24);
-            /*gfx_PrintIntXY(shooter->projectile->angle,3,0,8);*/
+            move_proj(grid,shooter,2);
             gfx_TransparentSprite(bubble_sprites[shooter->projectile->color], shooter->projectile->x, shooter->projectile->y);
         }
-
-        point = getGridPosition(x,y);
-        gfx_PrintIntXY(x,3,0,0);
-        gfx_PrintIntXY(y,3,32,0);
-        gfx_PrintIntXY(point.x,3,0,8);
-        gfx_PrintIntXY(point.y,3,32,8);
+        
         renderShooter(shooter);
         renderGrid(grid);
         gfx_SetColor(0);
         gfx_Rectangle(grid->x,grid->y,grid->width,grid->height);
-        gfx_PrintIntXY(shooter->angle,3,0,32);
-        gfx_PrintIntXY(shooter->flags,3,32,32);
         gfx_PrintStringXY(fps_string,0,232);
-       // gfx_PrintIntXY(fps_counter,3,0,224);
         fps_counter++;
         if (fps_counter == 15) {
-            seconds = (float)atomic_load_increasing_32(&timer_1_Counter) / 32768;
-            fps = (float) fps_counter / seconds;
+            ticks = (float)atomic_load_increasing_32(&timer_1_Counter) / 32768;
+            fps = (float) fps_counter / ticks;
             strcpy(&fps_string[5],printfloat(fps));
             fps_counter = 0;
             timer_Control = TIMER1_DISABLE;
@@ -175,8 +144,19 @@ void main(void) {
             timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
         }
         gfx_BlitBuffer();
+/*        if (debug_flag) {
+            timer_Control = TIMER1_DISABLE; //Just a pause
+            while(os_GetCSC());
+            while(!os_GetCSC());
+            debug_flag = false;
+            timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
+        }*/
     }
+    free(grid->bubbles);
+    grid->bubbles = NULL;
     free(grid);
+    free(shooter->projectile);
+    shooter->projectile = NULL;
     free(shooter);
     gfx_End();
 }
