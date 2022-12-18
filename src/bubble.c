@@ -163,7 +163,7 @@ void renderShooter(shooter_t * shooter) {
     point_t center;
     center.x = shooter->x + (TILE_WIDTH >> 1);
     center.y = shooter->y + (TILE_HEIGHT >> 1);
-    gfx_palette[shooter->pal_index] = gfx_Lighten(bubble_colors[shooter->next_bubbles[0]],255-randInt(0,1));
+    gfx_palette[shooter->pal_index] = gfx_Lighten(bubble_colors[shooter->next_bubbles[0]],255-(rtc_Time()%3));
     gfx_SetColor(shooter->pal_index);
     //gfx_FillCircle(center.x,center.y,TILE_WIDTH>>1);
     gfx_Line(center.x,center.y,center.x + ((float)1.5 * TILE_WIDTH) * sin(rad((float)shooter->angle)),center.y - ((float)1.5 * TILE_HEIGHT) * cos(rad((float)shooter->angle)));
@@ -184,7 +184,7 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
 void move_proj(grid_t * grid,shooter_t * shooter,float dt) {
     uint8_t i,j;
     //char * c;
-    uint8_t index; // uint8_t or int
+    uint8_t index; // uint8_t for now
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = shooter->projectile;
     //c = malloc(9);
@@ -207,23 +207,6 @@ void move_proj(grid_t * grid,shooter_t * shooter,float dt) {
         shooter->flags &= ~(ACTIVE_PROJ);
         return;
     }
-    /*if (proj_coord.x <= grid->x) {
-        projectile->angle = 0 - projectile->angle;
-        proj_coord.x = grid->x;
-        projectile->x = (float) proj_coord.x;
-    } else if (proj_coord.x + TILE_WIDTH >= grid->x + grid->width) {
-        projectile->angle = 0 - projectile->angle;
-        proj_coord.x = grid->x + grid->width - TILE_WIDTH;
-        projectile->x = (float) proj_coord.x;
-    }
-    if (proj_coord.y <= grid->y) {
-        projectile->y = grid->y;
-        snapBubble(projectile, grid);
-        shooter->flags &= ~(ACTIVE_PROJ);
-        return;
-    }*/
-    //proj_coord.x -= grid->x;
-    //proj_coord.y -= grid->y; //does nothing for now.
     if (proj_coord.x > grid->width || proj_coord.y > grid->height) {
         return;
     }
@@ -239,14 +222,17 @@ void move_proj(grid_t * grid,shooter_t * shooter,float dt) {
                         coord.x + (TILE_WIDTH>>1),
                         coord.y + (TILE_HEIGHT>>1),
                         grid->ball_diameter)) {
-                /*gfx_SetColor(10);
+                /*Debug: Highlight collision
+                 gfx_SetColor(10);
                 gfx_Circle(projectile->x,projectile->y,grid->ball_diameter>>1);
                 gfx_SetColor(20);
                 gfx_Circle(coord.x+grid->x,coord.y+grid->y,grid->ball_diameter>>1);
                 gfx_BlitBuffer();
-                while(!os_GetCSC());*/
+                while(!os_GetCSC());
+                 */
                 snapBubble(projectile,grid);
                 shooter->flags &= ~(ACTIVE_PROJ);
+                //free(projectile);
                 return;
             }
         }
@@ -292,6 +278,7 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
         grid->bubbles[index].color = projectile->color;
         grid->flags |= RENDER;
         cluster = findCluster(grid,gridpos.x, gridpos.y, true, true, false);
+
         debug_foundcluster = copyBubbleList(cluster);
         debug_flag = true;
         /* Debug: Print foundcluster info
@@ -307,7 +294,7 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
         if (cluster->size >= 3) {
             grid->score += 100 * (cluster->size - 2);
             grid->flags |= POP; //pop animation starts
-            if(pop_cluster != NULL) {
+            if(pop_cluster != NULL) { //hopefully stop leaks?
                 free(pop_cluster);
                 for(i = 0;i < pop_cluster->size;i++) {
                     free(pop_locations[i]);
@@ -315,8 +302,9 @@ void snapBubble(projectile_t * projectile,grid_t * grid) {
                 free(pop_locations);
             }
             pop_cluster = copyBubbleList(cluster);
-            for (i = 0;i < cluster->size;i++)
+            for (i = 0;i < cluster->size;i++) {
                 grid->bubbles[cluster->bubbles[i].y * grid->cols + cluster->bubbles[i].x].flags |= EMPTY;
+            }
         }
         free(cluster);
     }
@@ -445,7 +433,6 @@ bubble_list_t * findCluster(grid_t * grid,uint8_t tile_x,uint8_t tile_y,bool mat
             foundcluster->size++;
             // Get the neighbors of the current tile
             neighbors = getNeighbors(grid,currenttile.x,currenttile.y);
-            dbg_printf("Location of neighbors: %x\n",(unsigned int) &neighbors);
             // Check the type of each neighbor
             for (i = 0;i < neighbors->size;i++) {
                 if (!(neighbors->bubbles[i].flags & PROCESSED)) {
@@ -457,6 +444,7 @@ bubble_list_t * findCluster(grid_t * grid,uint8_t tile_x,uint8_t tile_y,bool mat
                     grid->bubbles[(neighbors->bubbles[i].y * grid->cols) + neighbors->bubbles[i].x].flags |= PROCESSED;
                 }
             }
+            dbg_printf("Location of neighbors: %x\n",(unsigned int) &neighbors);
             free(neighbors); //fixed. check other malloc functions...
         }
         //Debug

@@ -41,7 +41,6 @@ gfx_PrintInt(i,length)
 #endif
 
 extern uint8_t row_offset; // 0: even row; 1: odd row
-extern uint8_t pop_counter;//timer for pop animation
 extern bool debug_flag;
 extern bubble_list_t * debug_foundcluster;
 extern bubble_list_t * pop_cluster;
@@ -51,11 +50,13 @@ extern const uint16_t bubble_colors[7];
 
 extern bool pop_started;
 extern int ** pop_locations;
+extern uint8_t pop_counter; // timer for pop animation
 
 
-bool debug_foundcluster_freed;
-bool pop_cluster_freed;
-bool pop_locations_freed;
+//bool debug_foundcluster_freed;
+//bool pop_cluster_freed;
+//bool pop_locations_freed;
+
 //extern enum gamestate;
 char * printfloat(float elapsed) {
     real_t elapsed_real;
@@ -67,7 +68,7 @@ char * printfloat(float elapsed) {
 }
 int main(void) {
     uint8_t x,y;
-    int i;
+    int i; //universal counter
     
     int debug_foundcluster_timer = 0;
     uint8_t fps_counter;
@@ -124,7 +125,8 @@ int main(void) {
     gfx_SetPalette(bubble_pal,sizeof_bubble_pal,0);
     gfx_SetPalette(bubble_colors,14,sizeof_bubble_pal>>1);
     row_offset = 0;
-    //x = y = 0;
+    
+    x = y = 0;
     strcpy(fps_string,"FPS: ");
     fps_counter = 0;
     
@@ -219,7 +221,7 @@ int main(void) {
                 free(pop_cluster);
                 pop_locations = NULL;
                 pop_cluster = NULL;
-                pop_locations_freed = true;
+//                pop_locations_freed = true;
             }
         }
         /*Debug: Show neighbors*/
@@ -325,8 +327,10 @@ int main(void) {
     free(grid->bubbles);
     grid->bubbles = NULL;
     free(grid);
+    grid = NULL;
     free(shooter->projectile);
     shooter->projectile = NULL;
     free(shooter);
+    shooter = NULL;
     gfx_End();
 }

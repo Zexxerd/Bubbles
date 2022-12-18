@@ -1,0 +1,29 @@
+palettes:
+  - name: bubble_pal
+    fixed-entries:
+      - color: {index: 0, r: 0, g: 0, b: 0}
+    images: automatic
+
+converts:
+  - name: bubbles
+    
+    palette: bubble_pal
+    transparent-color-index: 0
+    images:
+      - bubble_red.png
+      - bubble_yellow.png
+      - bubble_orange.png
+      - bubble_green.png
+      - bubble_blue.png
+      - bubble_purple.png
+      - bubble_violet.png
+
+outputs:
+  - type: c
+    include-file: bubble.h
+    prepend-palette-sizes: true
+    
+    palettes:
+      - bubble_pal
+    converts:
+      - bubbles

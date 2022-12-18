@@ -29,14 +29,14 @@
 #define RENDER   (1<<0) // redraw grid
 #define SHIFT    (1<<1) // the grid goes down one
 #define NEW_ROW  (1<<1) // ^^
-#define POP      (1<<2) // 
+#define POP      (1<<2) // Bubbles are popping.
 
-//debug macros
+/*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
 gfx_PrintUInt(i,length)
 #define gfx_PrintIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
 gfx_PrintInt(i,length)
-  //basic debug message
+//basic debug message
 #define debug_message(message)  \
 gfx_FillScreen(255);             \
 gfx_PrintStringXY(message,0,116); \
