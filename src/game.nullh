@@ -1,0 +1,24 @@
+// Program Name: BUBBLES
+// Author(s): SomeCoolGuy
+// Description: Bubbles!
+
+/* Keep these headers */
+#include <tice.h>
+
+/* Standard headers - it's recommended to leave them included */
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <graphx.h>
+#include <keypadc.h>
+#include "pixelate.h"
+#include "bubble.h"
+#include "gfx/bubble.h"
+
+typedef struct player {
+    int score;
+    shooter_t shooter;
+    grid_t * grid;
+} Player;
+void game(void);
