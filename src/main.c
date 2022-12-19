@@ -41,8 +41,10 @@ gfx_PrintInt(i,length)
 #endif
 
 extern uint8_t row_offset; // 0: even row; 1: odd row
+extern uint8_t game_flags; //global because our grid is no longer a pointer
+extern unsigned int player_score;
 extern bool debug_flag;
-extern bubble_list_t * debug_foundcluster;
+
 extern bubble_list_t * pop_cluster;
 
 extern gfx_sprite_t * bubble_sprites[7];
@@ -53,15 +55,13 @@ extern int ** pop_locations;
 extern uint8_t pop_counter; // timer for pop animation
 
 
-//bool debug_foundcluster_freed;
 //bool pop_cluster_freed;
 //bool pop_locations_freed;
 
 //extern enum gamestate;
 char * printfloat(float elapsed) {
     real_t elapsed_real;
-    char * str;
-    str = malloc(10);
+    static char str[10];
     elapsed_real = os_FloatToReal(elapsed <= 0.001f ? 0.0f : elapsed);
     os_RealToStr(str, &elapsed_real, 8, 1, 2);
     return str;
@@ -70,55 +70,56 @@ int main(void) {
     uint8_t x,y;
     int i; //universal counter
     
-    int debug_foundcluster_timer = 0;
     uint8_t fps_counter;
     float fps,last_fps,ticks;
     uint8_t fps_ratio;
     char debug_string[40];
     char * fps_string;
+    char * fps_holder;
     
     //point_t point;
-    shooter_t * shooter;
-    grid_t * grid;
+    shooter_t shooter;
+    grid_t grid;
     gfx_sprite_t * grid_buffer;
-    bubble_list_t * neighbors;
+    bubble_list_t neighbors;
     bubble_list_t * foundcluster;
     x = y = 0;
     pop_counter = 0;
     fps = last_fps = 30;
     fps_string = malloc(15);
 
-    //allocate memory for shooter
-    if ((shooter = (shooter_t *) malloc(sizeof(shooter_t))) == NULL) exit(1);
-    dbg_printf("Location of shooter: %x\n",(unsigned int) &shooter); //debug
-    shooter->x = 160 - (TILE_WIDTH>>1);
-    shooter->y = 220 - (TILE_HEIGHT>>1);
-    shooter->angle = 0;
-    shooter->pal_index  = (sizeof_bubble_pal>>1) + 7;
-    shooter->projectile = (projectile_t *) malloc(sizeof(projectile_t));
-    shooter->projectile->speed = 5;
+    //shooter
+    shooter.x = 160 - (TILE_WIDTH>>1);
+    shooter.y = 220 - (TILE_HEIGHT>>1);
+    shooter.angle = 0;
+    shooter.pal_index  = (sizeof_bubble_pal>>1) + 7;
+    shooter.projectile.speed = 5;
+    for (i = 0;i < 3;i++)
+        shooter.next_bubbles[i] = randInt(0,MAX_COLOR);
+    shooter.flags = 0x00;
     
-    //Allocate memory for grid
-    grid = (grid_t *) malloc(sizeof(grid_t));
-    if (grid == NULL) exit(1);
-    dbg_printf("Location of grid: %x\n",(unsigned int) &grid); //debug
-    grid->x = 160 - (((TILE_WIDTH * 7) + (TILE_WIDTH>>1))>>1);
-    grid->y = 0;
-    grid->ball_diameter = (TILE_WIDTH);
-    grid->flags = RENDER;
-    grid->cols = 7;
-    grid->rows = 17; //16 + deadzone
-    grid->width = (TILE_WIDTH * grid->cols) + (TILE_WIDTH>>1);
-    grid->height = (ROW_HEIGHT * grid->rows) + (TILE_WIDTH>>2);
-    grid->bubbles = (bubble_t *) malloc((grid->cols*grid->rows) * sizeof(bubble_t));
-    if (grid->bubbles == NULL) exit(1);
-    grid->score = 0;
+    shooter.projectile.x = 0;
+    shooter.projectile.y = 0;
+    shooter.projectile.color = 0;
+    shooter.projectile.angle = 0;
+    //grid
+    grid.x = 160 - (((TILE_WIDTH * 7) + (TILE_WIDTH>>1))>>1);
+    grid.y = 0;
+    grid.ball_diameter = TILE_WIDTH;
+    game_flags = RENDER;
+    grid.cols = 7;
+    grid.rows = 17; //16 + deadzone
+    grid.width = (TILE_WIDTH * grid.cols) + (TILE_WIDTH>>1);
+    grid.height = (ROW_HEIGHT * grid.rows) + (TILE_WIDTH>>2);
+    grid.bubbles = (bubble_t *) malloc((grid.cols*grid.rows) * sizeof(bubble_t));
+    if (grid.bubbles == NULL) exit(1);
+    player_score = 0;
     //declare an image buffer for the grid
-    grid_buffer = gfx_MallocSprite(grid->cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * grid->rows + (TILE_WIDTH>>2));
+    grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * grid.rows + (TILE_WIDTH>>2));
     if (grid_buffer == NULL) exit(1);
     
     srand(rtc_Time());
-    initGrid(grid,grid->rows,grid->cols,10);
+    initGrid(grid,grid.rows,grid.cols,10);
     gfx_palette[255] = 0xFFFF;
     gfx_Begin();
     gfx_SetDrawBuffer();
@@ -137,44 +138,45 @@ int main(void) {
     
     /*Main game*/
     while (!(kb_Data[6] & kb_Clear)) {
-        if (grid->flags & RENDER) {
+        if (game_flags & RENDER) {
             //gfx_SetDrawBuffer();
             renderGrid(grid,grid_buffer);
             dbg_printf("Location of grid_buffer: %x\n\n",(unsigned int) &grid_buffer);
-            grid->flags &= ~RENDER;
+            game_flags &= ~RENDER;
         }
         gfx_FillScreen(255);  //Change render method (speed!)
         kb_Scan();
         if (kb_Data[7] & kb_Left) {
             x -= (x > 0);
-            if (shooter->angle > LBOUND)
-                shooter->angle-=4;
+            if (shooter.angle > LBOUND)
+                shooter.angle-=4;
         }
         if (kb_Data[7] & kb_Right) {
-            x += (x < grid->cols-1);
-            if (shooter->angle < RBOUND)
-                shooter->angle+=4;
+            x += (x < grid.cols-1);
+            if (shooter.angle < RBOUND)
+                shooter.angle+=4;
         }
         if (kb_Data[7] & kb_Up)
             y -= (y > 0);
         if (kb_Data[7] & kb_Down)
-            y += (y < grid->rows-1);
+            y += (y < grid.rows-1);
         /*Shoot bubbles*/
         if (kb_Data[1] & kb_2nd) {
-            if (!(shooter->flags & ACTIVE_PROJ)) {
-                shooter->projectile->x = shooter->x;
-                shooter->projectile->y = shooter->y;
-                shooter->projectile->angle = shooter->angle;
-                shooter->projectile->color = shooter->next_bubbles[0];
-                shooter->next_bubbles[0] = shooter->next_bubbles[1];
-                shooter->next_bubbles[1] = shooter->next_bubbles[2];
-                shooter->next_bubbles[2] = randInt(0, MAX_COLOR);
-                shooter->flags |= ACTIVE_PROJ;
+            if (!(shooter.flags & ACTIVE_PROJ)) {
+                shooter.projectile.x = shooter.x;
+                shooter.projectile.y = shooter.y;
+                shooter.projectile.angle = shooter.angle;
+                shooter.projectile.color = shooter.next_bubbles[0];
+                shooter.next_bubbles[0] = shooter.next_bubbles[1];
+                shooter.next_bubbles[1] = shooter.next_bubbles[2];
+                shooter.next_bubbles[2] = randInt(0, MAX_COLOR);
+                shooter.flags |= ACTIVE_PROJ;
             }
         }
-        if (grid->flags & POP) {
+        if (game_flags & POP) {
             if (!pop_started) {
                 pop_locations = (int **) malloc(sizeof(int**) * pop_cluster->size);
+                dbg_getlocation(pop_cluster);
                 dbg_getlocation(pop_locations);
 
                 if (pop_locations == NULL) {
@@ -199,8 +201,8 @@ int main(void) {
                         exit(1);
                     }
                     //debug
-                    pop_locations[i][0] = TILE_WIDTH * pop_cluster->bubbles[i].x + grid->x;
-                    pop_locations[i][1] = ROW_HEIGHT  * pop_cluster->bubbles[i].y + grid->y;
+                    pop_locations[i][0] = TILE_WIDTH * pop_cluster->bubbles[i].x + grid.x;
+                    pop_locations[i][1] = ROW_HEIGHT  * pop_cluster->bubbles[i].y + grid.y;
                 }
                 pop_started = true;
                 dbg_printf("\n");
@@ -215,9 +217,13 @@ int main(void) {
             pop_counter++;
             if (pop_counter == 20) {
                 pop_counter = 0;
-                pop_started = false; //remove
-                grid->flags &= ~POP;
+                pop_started = false;
+                game_flags &= ~POP;
+                for (i = 0;i < pop_cluster->size;i++) {
+                    free(pop_locations[i]);
+                }
                 free(pop_locations);
+                free(pop_cluster->bubbles);
                 free(pop_cluster);
                 pop_locations = NULL;
                 pop_cluster = NULL;
@@ -227,18 +233,17 @@ int main(void) {
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
             while (kb_Data[2] & kb_Alpha) kb_Scan();
-            neighbors = getNeighbors(grid,grid->bubbles[(y*grid->cols) + x].x,grid->bubbles[(y*grid->cols) + x].y);
+            neighbors = getNeighbors(grid,grid.bubbles[(y*grid.cols) + x].x,grid.bubbles[(y*grid.cols) + x].y);
             
             gfx_SetColor(255);
-            gfx_FillRectangle(0,16,100,neighbors->size<<3);
+            gfx_FillRectangle(0,16,100,neighbors.size<<3);
             gfx_PrintStringXY("Neighbors:",0,16);
-            for (i = 0;i < neighbors->size;i++){
-                sprintf(debug_string,"(%d,%d) %d",neighbors->bubbles[i].x,neighbors->bubbles[i].y,neighbors->bubbles[i].color);
+            for (i = 0;i < neighbors.size;i++){
+                sprintf(debug_string,"(%d,%d) %d",neighbors.bubbles[i].x,neighbors.bubbles[i].y,neighbors.bubbles[i].color);
                 gfx_PrintStringXY(debug_string,gfx_GetStringWidth("Neighbors:"),16+(i<<3));
             }
             gfx_BlitBuffer();
             while(!(kb_Data[6] & kb_Enter)) kb_Scan();
-            free(neighbors);
         }
         /*Debug: Foundcluster*/
         if (kb_Data[1] & kb_Mode) {
@@ -255,56 +260,46 @@ int main(void) {
             }
             gfx_BlitBuffer();
             while(!(kb_Data[6] & kb_Enter)) kb_Scan();
+            free(foundcluster->bubbles);
             free(foundcluster);
         }
-        
+        /*Debug: Change color*/
+        if (kb_Data[2] & kb_Math) {
+            if (shooter.next_bubbles[0]++ == MAX_COLOR)
+                shooter.next_bubbles[0] = 0;
+        }
+        if (kb_Data[3] & kb_Apps) {
+            if (!shooter.next_bubbles[0]--)
+                shooter.next_bubbles[0] = MAX_COLOR;
+        }
         //gfx_FillScreen(255);  //Change render method (speed!)
         
-        if (debug_foundcluster->size && debug_flag) {
-            for (i = 0; i < debug_foundcluster->size; i++) {
-                drawTile(debug_foundcluster->bubbles[i].color,320-TILE_WIDTH,i * TILE_HEIGHT);
-            }
-            if (debug_foundcluster_timer > 30) {
-                free(debug_foundcluster);
-                debug_foundcluster = NULL;
-                debug_foundcluster_timer = 0;
-                debug_flag = false;
-            } else {
-                debug_foundcluster_timer++;
-            }
-        }
-            
-        
         //Move the projectile
-        if (shooter->flags & ACTIVE_PROJ) {
+        if (shooter.flags & ACTIVE_PROJ) {
             fps_ratio = (uint8_t) fps/last_fps;
             fps_ratio = fps_ratio || 1;
-            move_proj(grid,shooter,fps_ratio << 1);
-                gfx_TransparentSprite(bubble_sprites[shooter->projectile->color], shooter->projectile->x, shooter->projectile->y);
+            move_proj(grid,&shooter,fps_ratio << 1);
+                gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
         }
         //Display
         renderShooter(shooter);
-        gfx_TransparentSprite(grid_buffer,grid->x,grid->y); //grid
+        gfx_TransparentSprite(grid_buffer,grid.x,grid.y); //grid
         gfx_SetTextXY(0,32);
         gfx_PrintString("Score: ");
         gfx_SetTextXY(60,32);
-        gfx_PrintInt(grid->score,5);
+        gfx_PrintInt(player_score,5);
         gfx_PrintStringXY("X:",0,0);
         //Debug
         
         /*Draw a highlight for the highlighted square*/
         gfx_SetColor(5);
-        gfx_FillRectangle((x*TILE_WIDTH)+(((y+row_offset) % 2)?(TILE_WIDTH>>1):0)+grid->x,(y*ROW_HEIGHT)+grid->y,TILE_WIDTH,TILE_HEIGHT);
+        gfx_FillRectangle((x*TILE_WIDTH)+(((y+row_offset) % 2)?(TILE_WIDTH>>1):0)+grid.x,(y*ROW_HEIGHT)+grid.y,TILE_WIDTH,TILE_HEIGHT);
         gfx_SetColor(0);
-        gfx_Rectangle(grid->x,grid->y,grid->width,grid->height-ROW_HEIGHT);
+        gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
         gfx_PrintStringXY("X:",0,0);
         gfx_PrintStringXY("Y:",0,8);
-        gfx_PrintStringXY("TILE X:",0,16);
-        gfx_PrintStringXY("TILE Y:",0,24);
         gfx_PrintUIntXY(x,2,20,0);
         gfx_PrintUIntXY(y,2,20,8);
-        gfx_PrintUIntXY(grid->bubbles[y*grid->cols + x].x,2,60,16);
-        gfx_PrintUIntXY(grid->bubbles[y*grid->cols + x].y,2,60,24);
         //Debug
         gfx_PrintStringXY(fps_string,0,232);
         fps_counter++;
@@ -312,7 +307,8 @@ int main(void) {
             ticks = (float)atomic_load_increasing_32(&timer_1_Counter) / 32768;
             last_fps = fps;
             fps =  7 / ticks; //(float)fps_counter / ticks;
-            strcpy(&fps_string[5],printfloat(fps));
+            fps_holder = printfloat(fps);
+            strcpy(&fps_string[5],fps_holder);
             fps_counter = 0;
             timer_Control = TIMER1_DISABLE;
             timer_1_Counter = 0;
@@ -321,16 +317,9 @@ int main(void) {
         gfx_SetTextFGColor(0);
         gfx_BlitBuffer(); //render the whole thing
     }
-    grid->flags = 0;
-    shooter->flags = 0;
-    shooter->projectile->x = shooter->projectile->y = shooter->projectile->speed = shooter->projectile->color = 0;
-    free(grid->bubbles);
-    grid->bubbles = NULL;
-    free(grid);
-    grid = NULL;
-    free(shooter->projectile);
-    shooter->projectile = NULL;
-    free(shooter);
-    shooter = NULL;
+    game_flags = 0;
+    shooter.flags = 0;
+    shooter.projectile.x = shooter.projectile.y = shooter.projectile.speed = shooter.projectile.color = 0;
+    free(grid.bubbles);
     gfx_End();
 }
