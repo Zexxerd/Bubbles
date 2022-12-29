@@ -1,3 +1,5 @@
+#if !defined BUBBLE_H
+#define BUBBLE_H
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +32,7 @@
 #define SHIFT    (1<<1) // the grid goes down one
 #define NEW_ROW  (1<<1) // ^^
 #define POP      (1<<2) // Bubbles are popping.
+#define FALLING  (1<<3) // Falling bubbles, wear a helmet
 
 /*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
@@ -42,9 +45,9 @@ gfx_FillScreen(255);             \
 gfx_PrintStringXY(message,0,116); \
 gfx_BlitBuffer();                  \
 while (!os_GetCSC())
-
+//explicitly associated with debug.h
 #define dbg_getlocation(pointer) dbg_printf("Location of " #pointer ": %x\n",(unsigned int) &pointer);\
-dbg_printf("Location of " #pointer " memory: %x\n",pointer)
+dbg_printf("Location of " #pointer " memory: %x\n",(unsigned int) pointer)
 
 //#define debug_flag() debug_flag = true //trashy, I know...
 
@@ -86,6 +89,7 @@ typedef struct projectile {
     float x, y;
     uint8_t speed;
     uint8_t color;
+    bool visible;
     int angle;
 } projectile_t;
 
@@ -101,7 +105,7 @@ typedef struct shooter {
 char * uint8_to_bin(uint8_t n);
 
 bubble_t newBubble(uint8_t x,uint8_t y,uint8_t color,uint8_t flags);
-bubble_list_t * copyBubbleList(bubble_list_t * original);
+bubble_list_t copyBubbleList(bubble_list_t original);
 void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);
@@ -113,5 +117,7 @@ void snapBubble(projectile_t * projectile,grid_t grid);
 void move_proj(grid_t grid,shooter_t * shooter,float dt);
 void resetProcessed(grid_t grid);
 bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley);
-bubble_list_t * findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
-/*bubble_list_t * findFloatingClusters(grid_t * grid);*/
+bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
+bubble_list_t * findFloatingClusters(grid_t grid);
+
+#endif // BUBBLE_H
