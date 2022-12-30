@@ -26,8 +26,6 @@
 #define ACTIVE_PROJ (1<<0)
 #define DEACTIVATED (1<<1)
 
-/*TODO: Display the bubbles in the foundcluster on the main shooting screen*/
-
 /*Globals*/
 uint8_t row_offset; // 0: even row; 1: odd row
 unsigned int player_score;
@@ -41,10 +39,9 @@ bubble_list_t pop_cluster;
 uint8_t pop_counter;// timer for pop animation
 
 bool fall_started;
-int ** fall_locations;
-bubble_list_t * floating_clusters;
-int floating_clusters_size; //holds foundclusters_size
-int floating_clusters_total;
+int ** fall_data;
+int fall_total;
+//bubble_list_t * floating_clusters;
 uint8_t fall_counter;// timer for pop animation
 
 uint8_t game_flags;
@@ -83,9 +80,13 @@ const uint16_t bubble_colors[7] = {
 char * uint8_to_bin(uint8_t n) {
     /*This returns the MSB-first binary representation of an 8-bit unsigned number.
       Inputting an 8-bit signed number should probably work the same way.*/
-    char * ret;
+    static char * ret;
     uint8_t i;
-    ret = malloc(9*sizeof(char));
+    if (ret == NULL) {
+        ret = malloc(9*sizeof(char));
+        if (ret == NULL)
+            exit(1);
+    }
     for (i = 0;i < 8;i++) {
         ret[7 - i] = n & 1 ? '1' : '0';
         n >>= 1;
@@ -194,11 +195,9 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
 }
 void move_proj(grid_t grid,shooter_t * shooter,float dt) {
     uint8_t i,j;
-    //char * c;
     uint8_t index; // uint8_t for now
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = &shooter->projectile;
-    //c = malloc(9);
     projectile->x += dt * projectile->speed * sin(rad(projectile->angle));
     projectile->y -= dt * projectile->speed * cos(rad(projectile->angle));
     proj_coord.x =  projectile->x - grid.x;
@@ -307,39 +306,53 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
             for (i = 0;i < cluster.size;i++) {
                 grid.bubbles[cluster.bubbles[i].y * grid.cols + cluster.bubbles[i].x].flags |= EMPTY;
             }
-            /*
-            if (game_flags & FALLING) {
-                game_flags &= ~FALLING;
+            if (game_flags & FALL) {
+                game_flags &= ~FALL;
                 fall_started = false;
-                floating_clusters_total = 0;
-                for (i = 0;i < floating_clusters->size;i++) {
-                    floating_clusters_total += floating_clusters[i].size;
-                    free(floating_clusters[i].bubbles);
+                /*for (i = 0;i < grid.rows*grid.cols;i++) {
+                    if (grid.bubbles[i].flags & FALLING) {
+                        grid.bubbles[i].flags |= EMPTY;
+                        grid.bubbles[i].flags &= ~FALLING;
+                    }
+                }*/
+                for (i = 0;i < fall_total;i++) {
+                    grid.bubbles[fall_data[i][2] >> 8].flags &= ~FALLING;
+                    grid.bubbles[i].flags |= EMPTY;
+                    free(fall_data[i]);
                 }
-                free(floating_clusters);
-                for (i = 0;i < floating_clusters_total;i++) {
-                    free(fall_locations[i]);
-                }
-                free(fall_locations);
+                free(fall_data);
             }
-            floating_clusters = findFloatingClusters(grid);
-            if (floating_clusters_size == 0) {
-                //game_flags &= ~FALLING;
-                for (i = 0;i < 5;i++) { //initial max
-                    free(floating_clusters[i].bubbles);
+            fall_total = findFloatingClusters(grid);
+            if (fall_total > 0) {
+                game_flags |= FALL;
+                fall_data = (int **) malloc(fall_total * sizeof(int *));
+                dbg_getlocation(fall_data);
+                if (fall_data == NULL) {
+                    debug_message("fall data nul12ueno1u8932");
+                    exit(1);
                 }
-                free(floating_clusters);
-            } else {
-                floating_clusters_total = 0;
-                game_flags |= FALLING; //WE ARE HERE, IMPLEMENTING FLOATING CLUSTERS
-                for (i = 0;i < floating_clusters_size;i++) {
-                    for (j = 0;j < floating_clusters[i].size;j++) {
-                        grid.bubbles[floating_clusters[i].bubbles[j].y * grid.cols + floating_clusters[i].bubbles[j].x].flags |= EMPTY;
-                        floating_clusters_total++;
+                for (i = 0;i < fall_total;i++) {
+                    fall_data[i] = (int *) malloc(4 * sizeof(int)); //x,y,(index:16,velocity:8)
+                    dbg_getlocation(fall_data[i]);
+                    if (fall_data[i] == NULL) {
+                        dbg_printf("It was %d!!\n",i);
+                        debug_message("fall data membr fiweon394f43 null!!!");
+                        exit(1);
+                    }
+                }
+                j = 0;
+                for (i = 0;i < grid.rows*grid.cols;i++) {
+                    if (grid.bubbles[i].flags & FALLING) {
+                        gridpos = getTileCoordinate(grid.bubbles[i].x,grid.bubbles[i].y);
+                        fall_data[j][0] = gridpos.x + grid.x;
+                        fall_data[j][1] = gridpos.y + grid.y;
+                        fall_data[j][2] = randInt(-2,2);
+                        fall_data[j][3] = i;
+                        j++;
+                        grid.bubbles[i].flags |= EMPTY;
                     }
                 }
             }
-             */
         }
         free(cluster.bubbles);
     }
@@ -401,7 +414,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
     // Initialize the toprocess array with the specified tile
     if (toprocess.bubbles == NULL) {
         if ((toprocess.bubbles = (bubble_t *) malloc((grid.rows)*grid.cols*sizeof(bubble_t))) == NULL)
-            exit(1); //opsie dopsie!
+            exit(1); //oopsie doopsie!
     }
     
     if ((foundcluster.bubbles = (bubble_t *) malloc((grid.rows)*grid.cols*sizeof(bubble_t))) == NULL) {
@@ -452,61 +465,38 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
     return foundcluster;
 }
 
-/*TODO: Convert this to void function (use flags)*/
-bubble_list_t * findFloatingClusters(grid_t grid) {
+int findFloatingClusters(grid_t grid) { //rename to findFloatingBubbles?
     uint8_t i,j,k;
     bool floating;
-    int foundclusters_size;
-    const uint8_t initial_max = 5;
-    bubble_list_t *foundclusters; //array of found clusters
+    int fall_total;
     bubble_list_t foundcluster;
     bubble_t tile;
     resetProcessed(grid);
-    foundclusters = (bubble_list_t *) malloc(initial_max*sizeof(bubble_list_t)); //5
-    if (foundclusters == NULL) {
-        debug_message("sigh....");
-        exit(1); //oopums doopums!
-    }
-    foundclusters_size = 0;
+    fall_total = 0;
     for (i = 0;i < grid.rows;i++) {
         for (j = 0;j < grid.cols; j++) {
             tile = grid.bubbles[(i * grid.cols) + j];
             if (!(tile.flags & PROCESSED)) {
                 foundcluster = findCluster(grid, j, i, false, false, true);
-                if (foundcluster.size <= 0) {
-                    free(foundcluster.bubbles);
-                    continue;
-                }
-                floating = true;
-                for (k = 0;k < foundcluster.size;k++) {
-                    if (!foundcluster.bubbles[i].y) {
-                        // Tile is attached to the roof
-                        floating = false;
-                        break;
+                if (foundcluster.size > 0) {
+                    floating = true;
+                    for (k = 0;k < foundcluster.size;k++) {
+                        if (!foundcluster.bubbles[k].y) {
+                            // Tile is attached to the roof
+                            floating = false;
+                            break;
+                        }
+                    }
+                    if (floating) {
+                        for (i = 0;i < foundcluster.size;i++) {
+                            grid.bubbles[(foundcluster.bubbles[i].y * grid.cols) + foundcluster.bubbles[i].x].flags |= FALLING; //| EMPTY;
+                            fall_total++;
+                        }
                     }
                 }
-                if (floating) {
-                    /*for (i = 0;i < foundcluster.size;i++) {
-                        index = (foundcluster.bubbles[i].y * grid.cols) + foundcluster.bubbles[i].x;
-                        grid.bubbles[index].flags |= FALLING | EMPTY;
-                    }*/
-                    foundclusters_size++;
-                    if (foundclusters_size > initial_max) {
-                        foundclusters = (bubble_list_t *) realloc(foundclusters,foundclusters_size * sizeof(bubble_t *));
-                    }
-                    //foundclusters[foundclusters_size-1] = copyBubbleList(foundcluster);
-                    //free(foundcluster.bubbles);
-                    foundclusters[foundclusters_size-1].size = foundcluster.size;
-                    foundclusters[foundclusters_size-1].bubbles = foundcluster.bubbles;
-                } else {
-                    free(foundcluster.bubbles);
-                }
+                free(foundcluster.bubbles);
             }
         }
     }
-    if (foundclusters_size < initial_max) {
-        foundclusters = (bubble_list_t *) realloc(foundclusters,foundclusters_size * sizeof(bubble_t *));
-    }
-    floating_clusters_size = foundclusters_size;
-    return foundclusters;
+    return fall_total;
 }

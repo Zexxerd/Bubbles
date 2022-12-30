@@ -18,10 +18,17 @@
 #define deg(a) (a * (180 / M_PI))
 #define rad(a) (a * (M_PI / 180))
 
+//extract byte from int
+#define lower_byte(x) (x & 255)
+#define mid_byte(x) ((x >> 8) & 255)
+#define high_byte(x) ((x >> 16) & 255)
+
 //tiles
 #define PROCESSED (1<<0)
 #define REMOVED   (1<<1)
 #define EMPTY     (1<<2)
+#define POPPING   (1<<3)
+#define FALLING   (1<<4)
 
 //shooter
 #define ACTIVE_PROJ (1<<0)
@@ -32,7 +39,7 @@
 #define SHIFT    (1<<1) // the grid goes down one
 #define NEW_ROW  (1<<1) // ^^
 #define POP      (1<<2) // Bubbles are popping.
-#define FALLING  (1<<3) // Falling bubbles, wear a helmet
+#define FALL     (1<<3) // Falling bubbles, wear a helmet
 
 /*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
@@ -45,6 +52,7 @@ gfx_FillScreen(255);             \
 gfx_PrintStringXY(message,0,116); \
 gfx_BlitBuffer();                  \
 while (!os_GetCSC())
+
 //explicitly associated with debug.h
 #define dbg_getlocation(pointer) dbg_printf("Location of " #pointer ": %x\n",(unsigned int) &pointer);\
 dbg_printf("Location of " #pointer " memory: %x\n",(unsigned int) pointer)
@@ -94,7 +102,7 @@ typedef struct projectile {
 } projectile_t;
 
 typedef struct shooter {
-    int x,y; //center of shooter is half a tile added to these.
+    int x,y; //this is the top left corner, add TILE_(WIDTH or HEIGHT)/2 for center
     int angle;
     projectile_t projectile; //may allow for multiple later
     uint8_t pal_index;
@@ -118,6 +126,6 @@ void move_proj(grid_t grid,shooter_t * shooter,float dt);
 void resetProcessed(grid_t grid);
 bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley);
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
-bubble_list_t * findFloatingClusters(grid_t grid);
+int findFloatingClusters(grid_t grid);
 
 #endif // BUBBLE_H

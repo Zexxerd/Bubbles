@@ -11,12 +11,19 @@ converts:
     transparent-color-index: 0
     images:
       - bubble_red.png
-      - bubble_yellow.png
+      - bubble_red_pop.png
       - bubble_orange.png
+      - bubble_orange_pop.png
+      - bubble_yellow.png
+      - bubble_yellow_pop.png
       - bubble_green.png
+      - bubble_green_pop.png
       - bubble_blue.png
+      - bubble_blue_pop.png
       - bubble_purple.png
+      - bubble_purple_pop.png
       - bubble_violet.png
+      - bubble_violet_pop.png
 
 outputs:
   - type: c

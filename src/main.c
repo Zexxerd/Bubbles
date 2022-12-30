@@ -54,10 +54,8 @@ extern bubble_list_t pop_cluster;
 extern uint8_t pop_counter; // timer for pop animation
 
 extern bool fall_started;
-extern int ** fall_locations;
-extern bubble_list_t * floating_clusters;
-extern int floating_clusters_size; //holds foundclusters_size
-extern int floating_clusters_total;
+extern int ** fall_data;
+extern int fall_total;
 extern uint8_t fall_counter;
 //bool pop_cluster_freed;
 //bool pop_locations_freed;
@@ -73,7 +71,7 @@ char * printfloat(float elapsed) {
 int main(void) {
     uint8_t x,y;
     int i,j,k; //universal counter
-    
+    int debug_fall_total;
     uint8_t highlight_timer;
     uint8_t fps_counter;
     float fps,last_fps,ticks;
@@ -83,12 +81,12 @@ int main(void) {
     char * fps_string;
 
     point_t debug_point;
+    point_t point;
     shooter_t shooter;
     grid_t grid;
     gfx_sprite_t * grid_buffer;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
-    bubble_list_t * debug_foundclusters;
     x = y = 0;
     pop_counter = 0;
     fps = last_fps = 30;
@@ -151,7 +149,7 @@ int main(void) {
         if (game_flags & RENDER) {
             //gfx_SetDrawBuffer();
             renderGrid(grid,grid_buffer);
-            dbg_printf("Location of grid_buffer: %x\n\n",(unsigned int) &grid_buffer);
+            //dbg_printf("Location of grid_buffer: %x\n\n",(unsigned int) &grid_buffer);
             game_flags &= ~RENDER;
         }
         gfx_FillScreen(255);  //Change render method (speed!)
@@ -190,28 +188,20 @@ int main(void) {
                 dbg_getlocation(pop_locations);
 
                 if (pop_locations == NULL) {
-                    debug_message("pop_locations null!!!! :(") // add num of writes?
+                    debug_message("pop_locations null!!!! :(");
                     exit(1);
                 }
                 
                 for (i = 0;i < pop_cluster.size;i++) {
                     pop_locations[i] = (int *) malloc(sizeof(int *) << 1); //x, y
-                    /*Debug: pop_locations
-                    dbg_getlocation(pop_locations[i]);
-                        if (pop_locations[i] == NULL) {
-                        gfx_FillScreen(255);
-                        gfx_SetTextScale(2,2);
-                        sprintf(debug_string,"pop_locations[%d] null!!!!",i);
-                        gfx_PrintStringXY(debug_string,0,0);
-                        gfx_SetTextScale(1,1);
-                        sprintf(debug_string,"size: %d",sizeof(int*)<<1);
-                        gfx_PrintStringXY(debug_string,0,16);
-                        gfx_BlitBuffer();
-                        while(!os_GetCSC());
+                    if (pop_locations[i] == NULL) {
+                        debug_message("hooray!");
                         exit(1);
-                    }*/
+                    }
                     pop_locations[i][0] = TILE_WIDTH * pop_cluster.bubbles[i].x + grid.x;
-                    pop_locations[i][1] = ROW_HEIGHT  * pop_cluster.bubbles[i].y + grid.y;
+                    if (row_offset)
+                        pop_locations[i][0] += TILE_WIDTH >> 1;
+                    pop_locations[i][1] = ROW_HEIGHT * pop_cluster.bubbles[i].y + grid.y;
                 }
                 pop_started = true;
                 dbg_printf("\n");
@@ -237,54 +227,34 @@ int main(void) {
 //                pop_locations_freed = true;
             }
         }
-        /*
-        if (game_flags & FALLING) {
+        if (game_flags & FALL) {
             if (!fall_started) {
-                fall_started = true;
                 fall_counter = 0;
-                floating_clusters_total = 0;
-                for (i = 0;i < floating_clusters_size;i++) {
-                    floating_clusters_total += floating_clusters[i].size;
-                }
-                fall_locations = (int **) malloc(sizeof(int*) * floating_clusters_total);
-                k = 0;
-                for (i = 0;i < floating_clusters_total;i++) {
-                    for (j = 0;j < floating_clusters[i].size;j++, k++) {
-                        fall_locations[k] = (int *) malloc(sizeof(int) * 3); //x, y,xvel
-                        fall_locations[k][0] = TILE_WIDTH * floating_clusters[i].bubbles[j].x + grid.x;
-                        fall_locations[k][1] = ROW_HEIGHT * floating_clusters[i].bubbles[j].y + grid.y;
-                        fall_locations[k][2] = randInt(-5,5);
-                    }
+                fall_started = true;
+                for (i = 0;i < fall_total;i++) {
+                    dbg_printf("color of #%d: %d\n",i,grid.bubbles[fall_data[i][3]].color);
                 }
             }
             //Animate
             k = 0;
-            for (i = 0;i < floating_clusters_size;i++) {
-                for (j = 0;j < floating_clusters[i].size;j++, k++) {
-                    fall_locations[k][0] += fall_locations[k][2];
-                    fall_locations[k][1] += ((fall_counter + 1) * 2);
-                    gfx_TransparentSprite(bubble_sprites[floating_clusters[i].bubbles[j].color],fall_locations[k][0],fall_locations[k][1]);
-                }
+            for (i = 0;i < fall_total;i++) {
+                fall_data[i][0] += (int8_t) lower_byte(fall_data[i][2]);
+                fall_data[i][1] += (fall_counter * 5) >> 2;
+                    drawTile(grid.bubbles[fall_data[i][3]].color,fall_data[i][0],fall_data[i][1]);
             }
             dbg_printf("Fall counter: %d\n",fall_counter);
             fall_counter++;
-            if (fall_counter == 20) {
+            if (fall_counter == 25) {
                 fall_counter = 0;
                 fall_started = false;
-                game_flags &= ~FALLING;
-                k = 0;
-                for (i = 0;i < floating_clusters_size;i++) {
-                    for (j = 0;j < floating_clusters[i].size;j++,k++) {
-                        free(floating_clusters[i].bubbles);
-                        free(fall_locations[k]);
-                    }
+                game_flags &= ~FALL;
+                for(i = 0;i < fall_total;i++) {
+                    grid.bubbles[fall_data[i][3]].flags &= ~FALLING;
+                    free(fall_data[i]);
                 }
-                free(floating_clusters);
-                free(fall_locations);
-                fall_locations = NULL;
+                free(fall_data);
             }
         }
-        */
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
             while (kb_Data[2] & kb_Alpha) kb_Scan();
@@ -347,30 +317,20 @@ int main(void) {
         }
         
         if (kb_Data[4] & kb_Stat) {
-            debug_foundclusters = findFloatingClusters(grid);
-            dbg_getlocation(debug_foundclusters);
-            dbg_printf("Size of debug_foundclusters: %d\n",floating_clusters_size);
-            
-            for (i = 0;i < floating_clusters_size;i++) {
-                dbg_printf("Size of cluster #%d: %d\n",i,debug_foundclusters[i].size);
-                for(j = 0;j < debug_foundclusters[i].size;j++) {
-                    dbg_printf("Flags of cluster #%d, bubble #%d: %d\n",i,j,debug_foundclusters[i].bubbles[j].flags);
-                    drawTile(debug_foundclusters[i].bubbles[j].color,i*16,j*16);
+            gfx_FillScreen(255);
+            debug_fall_total = findFloatingClusters(grid);
+            gfx_PrintUIntXY(debug_fall_total,8,60,120);
+            for (i = 0;i < grid.cols*grid.rows;i++) {
+                if (grid.bubbles[i].flags & FALLING) {
+                    drawTile(grid.bubbles[i].color,grid.x+(grid.bubbles[i].x*TILE_WIDTH + (row_offset?TILE_WIDTH>>1:0)),grid.y+(grid.bubbles[i].y*ROW_HEIGHT));
                 }
             }
             gfx_BlitBuffer();
-            while (kb_Data[4] & kb_Stat) kb_Scan();
-
-            for (i = 0;i < floating_clusters_size;i++) {
-                for(j = 0;j < debug_foundclusters[i].size;j++) {
-                    free(debug_foundclusters[i].bubbles);
-                }
-            }
-            free(debug_foundclusters);
+            while(!os_GetCSC());
         }
         //Move the projectile
         if (shooter.flags & ACTIVE_PROJ) {
-            fps_ratio = (uint8_t) fps/last_fps;
+            fps_ratio = (uint8_t) (fps/last_fps);
             fps_ratio = fps_ratio || 1;
             move_proj(grid,&shooter,fps_ratio << 1);
                 gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
@@ -383,12 +343,13 @@ int main(void) {
         gfx_SetTextXY(60,32);
         gfx_PrintInt(player_score,5);
         gfx_PrintStringXY("X:",0,0);
-        //Debug
         
+        //Debug
         /*Draw a highlight for the highlighted square*/
         if ((highlight_timer-1) & 1) {
             gfx_SetColor(5);
             //gfx_FillRectangle((x*TILE_WIDTH)+(((y+row_offset) % 2)?(TILE_WIDTH>>1):0)+grid.x,(y*ROW_HEIGHT)+grid.y,TILE_WIDTH,TILE_HEIGHT);
+            
             debug_point = getTileCoordinate(x,y);
             gfx_FillRectangle(grid.x+debug_point.x,grid.y+debug_point.y,TILE_WIDTH,TILE_HEIGHT);
             drawTile(grid.bubbles[y * grid.cols + x].color,grid.x+debug_point.x,debug_point.y);
@@ -400,7 +361,20 @@ int main(void) {
         gfx_PrintStringXY("Y:",0,8);
         gfx_PrintUIntXY(x,2,20,0);
         gfx_PrintUIntXY(y,2,20,8);
-        //Debug
+        
+        if (game_flags & RENDER) {
+            gfx_PrintStringXY("game:RENDER",0,40);
+        }
+        if (game_flags & SHIFT) {
+            gfx_PrintStringXY("game:SHIFT",0,48);
+        }
+        if (game_flags & POP) {
+            gfx_PrintStringXY("game:POP",0,56);
+        }
+        if (game_flags & FALL) {
+            gfx_PrintStringXY("game:FALL",0,64);
+        }
+        //FPS
         gfx_PrintStringXY(fps_string,0,232);
         fps_counter++;
         if (fps_counter == 7) {
