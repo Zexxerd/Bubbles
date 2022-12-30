@@ -263,14 +263,22 @@ int main(void) {
             gfx_SetColor(255);
             gfx_FillRectangle(0,16,100,neighbors.size<<3);
             gfx_PrintStringXY("Neighbors:",0,16);
-            for (i = 0;i < neighbors.size;i++){
-                sprintf(debug_string,"(%d,%d) %d",neighbors.bubbles[i].x,neighbors.bubbles[i].y,neighbors.bubbles[i].color);
-                gfx_PrintStringXY(debug_string,gfx_GetStringWidth("Neighbors:"),16+(i<<3));
+            for (i = 0;i < neighbors.size;i++) {
+                //sprintf(debug_string,"(%d,%d) %d",neighbors.bubbles[i].x,neighbors.bubbles[i].y,neighbors.bubbles[i].color);
+                debug_point.x = gfx_GetStringWidth("Neighbors:");
+                debug_point.y = 16+(i<<3);
+                gfx_PrintStringXY("(",debug_point.x,debug_point.y);
+                gfx_PrintUIntXY(neighbors.bubbles[i].x,2,debug_point.x+8,debug_point.y);
+                gfx_PrintStringXY(",",debug_point.x+24,debug_point.y);
+                gfx_PrintUIntXY(neighbors.bubbles[i].y,2,debug_point.x+40,debug_point.y);
+                gfx_PrintStringXY(")",debug_point.x+56,debug_point.y);
+                gfx_PrintUIntXY(neighbors.bubbles[i].color,2,debug_point.x+72,debug_point.y);
             }
             gfx_BlitBuffer();
             while(!(kb_Data[6] & kb_Enter)) kb_Scan();
         }
         /*Debug: Foundcluster*/
+#ifdef DEBUG
         if (kb_Data[1] & kb_Mode) {
             while (kb_Data[1] & kb_Mode) kb_Scan();
             foundcluster = findCluster(grid,x,y,true,true,false);
@@ -287,6 +295,7 @@ int main(void) {
             while(!(kb_Data[6] & kb_Enter)) kb_Scan();
             free(foundcluster.bubbles);
         }
+#endif // DEBUG
         /*Debug: Change shooter color*/
         if (kb_Data[2] & kb_Math) {
             if (!shooter.next_bubbles[0]--)
