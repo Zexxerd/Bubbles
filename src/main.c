@@ -57,8 +57,6 @@ extern bool fall_started;
 extern int ** fall_data;
 extern int fall_total;
 extern uint8_t fall_counter;
-//bool pop_cluster_freed;
-//bool pop_locations_freed;
 
 //extern enum gamestate;
 char * printfloat(float elapsed) {
@@ -71,29 +69,36 @@ char * printfloat(float elapsed) {
 int main(void) {
     uint8_t x,y;
     int i,j,k; //universal counter
-    int debug_fall_total;
+    
     uint8_t highlight_timer;
     uint8_t fps_counter;
-    float fps,last_fps,ticks;
     uint8_t fps_ratio;
-    char debug_string[40];
-    char * fps_holder;
+    float fps, last_fps, ticks;
+    //char debug_string[40];
+    //char * fps_holder;
     char * fps_string;
 
+#ifdef DEBUG
+    int debug_fall_total;
     point_t debug_point;
     point_t point;
+    bubble_list_t neighbors;
+    bubble_list_t foundcluster;
+#endif //DEBUG
+    
     shooter_t shooter;
     grid_t grid;
     gfx_sprite_t * grid_buffer;
-    bubble_list_t neighbors;
-    bubble_list_t foundcluster;
+    
     x = y = 0;
-    pop_counter = 0;
     fps = last_fps = 30;
     fps_string = malloc(15);
 
+    pop_counter = 0;
+    fall_counter = 0;
     pop_started = false;
     fall_started = false;
+
     //shooter
     shooter.x = 160 - (TILE_WIDTH>>1);
     shooter.y = 220 - (TILE_HEIGHT>>1);
@@ -255,6 +260,7 @@ int main(void) {
                 free(fall_data);
             }
         }
+#ifdef DEBUG //manipulation
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
             while (kb_Data[2] & kb_Alpha) kb_Scan();
@@ -272,30 +278,30 @@ int main(void) {
                 gfx_PrintStringXY(",",debug_point.x+24,debug_point.y);
                 gfx_PrintUIntXY(neighbors.bubbles[i].y,2,debug_point.x+40,debug_point.y);
                 gfx_PrintStringXY(")",debug_point.x+56,debug_point.y);
-                gfx_PrintUIntXY(neighbors.bubbles[i].color,2,debug_point.x+72,debug_point.y);
+                gfx_PrintUIntXY(neighbors.bubbles[i].color,2,debug_point.x+64,debug_point.y);
             }
             gfx_BlitBuffer();
             while(!(kb_Data[6] & kb_Enter)) kb_Scan();
         }
         /*Debug: Foundcluster*/
-#ifdef DEBUG
         if (kb_Data[1] & kb_Mode) {
             while (kb_Data[1] & kb_Mode) kb_Scan();
             foundcluster = findCluster(grid,x,y,true,true,false);
-            
             gfx_SetColor(255);
             gfx_FillRectangle(220,0,100,foundcluster.size<<3);
             gfx_PrintStringXY("Foundcluster:",220,0);
             for (i = 0;i < foundcluster.size;i++){
-                sprintf(debug_string,"(%d,%d) (%d,%d)",foundcluster.bubbles[i].x,foundcluster.bubbles[i].y,foundcluster.bubbles[i].color,foundcluster.bubbles[i].flags);
-                gfx_PrintStringXY(debug_string,220,16+(i<<4));
+                debug_point.x = 220;
+                debug_point.y = 16+(i<<4);
+                gfx_PrintUIntXY(foundcluster.bubbles[i].x,2,debug_point.x,debug_point.y);
+                gfx_PrintUIntXY(foundcluster.bubbles[i].y,2,debug_point.x+24,debug_point.y);
+                gfx_PrintUIntXY(foundcluster.bubbles[i].color,2,debug_point.x+56,debug_point.y);
                 gfx_TransparentSprite(bubble_sprites[foundcluster.bubbles[i].color],LCD_WIDTH-TILE_WIDTH,16+(i<<4));
             }
             gfx_BlitBuffer();
             while(!(kb_Data[6] & kb_Enter)) kb_Scan();
             free(foundcluster.bubbles);
         }
-#endif // DEBUG
         /*Debug: Change shooter color*/
         if (kb_Data[2] & kb_Math) {
             if (!shooter.next_bubbles[0]--)
@@ -317,14 +323,12 @@ int main(void) {
             }
             game_flags |= RENDER;
         }
-        
         /*Debug: Enable/disable a tile*/
         if (kb_Data[1] & kb_Del) {
             grid.bubbles[y * grid.cols + x].flags ^= EMPTY;
             while (kb_Data[1] & kb_Del) kb_Scan();
             game_flags |= RENDER;
         }
-        
         if (kb_Data[4] & kb_Stat) {
             gfx_FillScreen(255);
             debug_fall_total = findFloatingClusters(grid);
@@ -337,6 +341,7 @@ int main(void) {
             gfx_BlitBuffer();
             while(!os_GetCSC());
         }
+#endif //DEBUG
         //Move the projectile
         if (shooter.flags & ACTIVE_PROJ) {
             fps_ratio = (uint8_t) (fps/last_fps);
@@ -347,30 +352,26 @@ int main(void) {
         //Display
         renderShooter(shooter);
         gfx_TransparentSprite(grid_buffer,grid.x,grid.y); //grid
+        gfx_SetColor(0);
+        gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
         gfx_SetTextXY(0,32);
         gfx_PrintString("Score: ");
         gfx_SetTextXY(60,32);
         gfx_PrintInt(player_score,5);
-        gfx_PrintStringXY("X:",0,0);
         
-        //Debug
+#ifdef DEBUG
         /*Draw a highlight for the highlighted square*/
         if ((highlight_timer-1) & 1) {
             gfx_SetColor(5);
-            //gfx_FillRectangle((x*TILE_WIDTH)+(((y+row_offset) % 2)?(TILE_WIDTH>>1):0)+grid.x,(y*ROW_HEIGHT)+grid.y,TILE_WIDTH,TILE_HEIGHT);
-            
             debug_point = getTileCoordinate(x,y);
             gfx_FillRectangle(grid.x+debug_point.x,grid.y+debug_point.y,TILE_WIDTH,TILE_HEIGHT);
             drawTile(grid.bubbles[y * grid.cols + x].color,grid.x+debug_point.x,debug_point.y);
         }
         highlight_timer++;
-        gfx_SetColor(0);
-        gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
         gfx_PrintStringXY("X:",0,0);
         gfx_PrintStringXY("Y:",0,8);
         gfx_PrintUIntXY(x,2,20,0);
         gfx_PrintUIntXY(y,2,20,8);
-        
         if (game_flags & RENDER) {
             gfx_PrintStringXY("game:RENDER",0,40);
         }
@@ -383,6 +384,7 @@ int main(void) {
         if (game_flags & FALL) {
             gfx_PrintStringXY("game:FALL",0,64);
         }
+#endif //DEBUG
         //FPS
         gfx_PrintStringXY(fps_string,0,232);
         fps_counter++;
@@ -390,8 +392,7 @@ int main(void) {
             ticks = (float)atomic_load_increasing_32(&timer_1_Counter) / 32768;
             last_fps = fps;
             fps =  7 / ticks; //(float)fps_counter / ticks;
-            fps_holder = printfloat(fps);
-            strcpy(&fps_string[5],fps_holder);
+            strcpy(&fps_string[5],printfloat(fps));
             fps_counter = 0;
             timer_Control = TIMER1_DISABLE;
             timer_1_Counter = 0;
