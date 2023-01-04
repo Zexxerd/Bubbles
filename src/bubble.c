@@ -339,6 +339,7 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
                         debug_message("fall data membr fiweon394f43 null!!!");
                         exit(1);
                     }
+                    player_score += 50 * (i + 1);
                 }
                 j = 0;
                 for (i = 0;i < grid.rows*grid.cols;i++) {
