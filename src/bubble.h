@@ -12,7 +12,6 @@
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
-#define MAX_COLOR 6
 
 //degrees to radians
 #define deg(a) (a * (180 / M_PI))
@@ -42,10 +41,14 @@
 #define FALL     (1<<3) // Falling bubbles, wear a helmet
 
 /*debug macros*/
-#define gfx_PrintUIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
-gfx_PrintUInt(i,length)
-#define gfx_PrintIntXY(i,length,x,y) gfx_SetTextXY(x,y);\
-gfx_PrintInt(i,length)
+#define gfx_PrintUIntXY(i,length,x,y) do { \
+gfx_SetTextXY(x,y);                         \
+gfx_PrintUInt(i,length);                     \
+} while (0)
+#define gfx_PrintIntXY(i,length,x,y)  do { \
+gfx_SetTextXY(x,y);                         \
+gfx_PrintInt(i,length);                      \
+} while (0)
 //basic debug message
 #define debug_message(message)  \
 gfx_FillScreen(255);             \
@@ -54,8 +57,10 @@ gfx_BlitBuffer();                  \
 while (!os_GetCSC())
 
 //explicitly associated with debug.h
-#define dbg_getlocation(pointer) dbg_printf("Location of " #pointer ": %x\n",(unsigned int) &pointer);\
-dbg_printf("Location of " #pointer " memory: %x\n",(unsigned int) pointer)
+#define dbg_getlocation(pointer) do {\
+dbg_printf("Location of " #pointer ": %x\n",(unsigned int) &pointer);\
+dbg_printf("Location of " #pointer " memory: %x\n",(unsigned int) pointer);\
+} while (0)
 
 //#define debug_flag() debug_flag = true //trashy, I know...
 

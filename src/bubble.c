@@ -12,7 +12,6 @@
 
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16
-#define MAX_COLOR 6
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
 #define deg(a) (a * (180 / M_PI))
 #define rad(a) (a * (M_PI / 180))
@@ -28,6 +27,7 @@
 
 /*Globals*/
 uint8_t row_offset; // 0: even row; 1: odd row
+uint8_t max_color;
 unsigned int player_score;
 
 bool debug_flag;
@@ -62,6 +62,16 @@ gfx_sprite_t * bubble_sprites[7] = { //bubbles sprites are stored here
     bubble_blue,
     bubble_purple,
     bubble_violet
+};
+
+gfx_sprite_t * bubble_pop_sprites[7] = {
+    bubble_red_pop,
+    bubble_orange_pop,
+    bubble_yellow_pop,
+    bubble_green_pop,
+    bubble_blue_pop,
+    bubble_purple_pop,
+    bubble_violet_pop
 };
 
 int8_t neighbor_offsets[2][6][2] = {{{1, 0}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}},  {{1, 0}, {1, 1}, {0, 1}, {-1, 0}, {0, -1}, {1, -1}}}; //(even, odd),(neighbors),(x,y)
@@ -116,7 +126,7 @@ bubble_list_t copyBubbleList(bubble_list_t original) { // deep copy
     return new;
 }
 void drawTile(uint8_t color,int x,int y) {
-    if (color > MAX_COLOR) return;
+    if (color > max_color) return;
     gfx_TransparentSprite(bubble_sprites[color],x,y);
 }
 point_t getTileCoordinate(int col,int row) {
