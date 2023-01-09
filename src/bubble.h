@@ -1,5 +1,6 @@
-#if !defined BUBBLE_H
+#if !defined(BUBBLE_H)
 #define BUBBLE_H
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,6 +120,7 @@ char * uint8_to_bin(uint8_t n);
 
 bubble_t newBubble(uint8_t x,uint8_t y,uint8_t color,uint8_t flags);
 bubble_list_t copyBubbleList(bubble_list_t original);
+uint8_t * getAvailableColors(grid_t grid);
 void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);
@@ -129,7 +131,7 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r);
 void snapBubble(projectile_t * projectile,grid_t grid);
 void move_proj(grid_t grid,shooter_t * shooter,float dt);
 void resetProcessed(grid_t grid);
-bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley);
+bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool check_empty);
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
 int findFloatingClusters(grid_t grid);
 

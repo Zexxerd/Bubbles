@@ -16,6 +16,7 @@
 
 #include "pixelate.h"
 #include "bubble.h"
+#include "level.h"
 #include "gfx/bubble.h"
 
 //matrix(x,y) = matrix((y * matrix_cols) + x)
@@ -29,7 +30,7 @@
 #define LBOUND -64
 #define RBOUND 64
 
-extern uint8_t row_offset; // 0: even row; 1: odd row
+extern uint8_t row_offset; // 0: even row shifted; 1: odd row shifted
 extern uint8_t max_color;
 
 extern uint8_t game_flags; //global because our grid is no longer a pointer
@@ -60,6 +61,7 @@ char * printfloat(float elapsed) {
 int main(void) {
     uint8_t x,y;
     int i,j,k; //universal counter
+    int turn_counter;
     
     uint8_t highlight_timer;
     uint8_t fps_counter;
@@ -67,7 +69,6 @@ int main(void) {
     float fps, last_fps, ticks;
     char * fps_string;
     point_t point;
-
 #ifdef DEBUG
     int debug_fall_total;
     point_t debug_point;
@@ -83,6 +84,7 @@ int main(void) {
     gfx_sprite_t * pop_sprite_rotations[3];
 
     max_color = 6;
+    turn_counter = 0;
     x = y = 0;
     fps = last_fps = 30;
     fps_string = malloc(15);
@@ -200,9 +202,11 @@ int main(void) {
                 pop_sprite_rotations[0] = gfx_FlipSpriteY(pop_sprite,pop_sprite_rotations[0]);
                 pop_sprite_rotations[1] = gfx_FlipSpriteX(pop_sprite,pop_sprite_rotations[1]);
                 pop_sprite_rotations[2] =  gfx_FlipSpriteX(pop_sprite_rotations[0],pop_sprite_rotations[2]);
-                
+                dbg_getlocation(pop_sprite);
+                for (i = 0;i < 3;i++)
+                    dbg_getlocation(pop_sprite_rotations[i]);
                 for (i = 0;i < pop_cluster.size;i++) {
-                    pop_locations[i] = (int *) malloc(sizeof(int *) << 1); //x, y
+                    pop_locations[i] = (int *) malloc(sizeof(int *) * 2); //x, y
                     if (pop_locations[i] == NULL) {
                         debug_message("hooray!");
                         exit(1);
@@ -217,6 +221,8 @@ int main(void) {
                 dbg_printf("\n");
             }
             for (i = 0;i < pop_cluster.size;i++) { //animate
+                if (pop_counter & 1)
+                    drawTile(pop_cluster.bubbles[i].color,pop_locations[i][0],pop_locations[i][1]);
                 point.x = pop_locations[i][0] - pop_counter;
                 point.y = pop_locations[i][1] - pop_counter;
                 gfx_TransparentSprite(pop_sprite,point.x,point.y);
@@ -237,7 +243,6 @@ int main(void) {
                 }
                 free(pop_locations);
                 free(pop_cluster.bubbles);
-                pop_locations = NULL;
             }
         }
         if (game_flags & FALL) {
@@ -255,7 +260,6 @@ int main(void) {
                 fall_data[i][1] += (fall_counter * 5) >> 2;
                     drawTile(grid.bubbles[fall_data[i][3]].color,fall_data[i][0],fall_data[i][1]);
             }
-            dbg_printf("Fall counter: %d\n",fall_counter);
             fall_counter++;
             if (fall_counter == 25) {
                 fall_counter = 0;
@@ -272,7 +276,7 @@ int main(void) {
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
             while (kb_Data[2] & kb_Alpha) kb_Scan();
-            neighbors = getNeighbors(grid,grid.bubbles[(y*grid.cols) + x].x,grid.bubbles[(y*grid.cols) + x].y);
+            neighbors = getNeighbors(grid,grid.bubbles[(y*grid.cols) + x].x,grid.bubbles[(y*grid.cols) + x].y,false);
             
             gfx_SetColor(255);
             gfx_FillRectangle(0,16,100,neighbors.size<<3);
@@ -289,7 +293,7 @@ int main(void) {
                 gfx_PrintUIntXY(neighbors.bubbles[i].color,2,debug_point.x+64,debug_point.y);
             }
             gfx_BlitBuffer();
-            while(!(kb_Data[6] & kb_Enter)) kb_Scan();
+            while(!os_GetCSC());
         }
         /*Debug: Foundcluster*/
         if (kb_Data[1] & kb_Mode) {
@@ -307,7 +311,7 @@ int main(void) {
                 gfx_TransparentSprite(bubble_sprites[foundcluster.bubbles[i].color],LCD_WIDTH-TILE_WIDTH,16+(i<<4));
             }
             gfx_BlitBuffer();
-            while(!(kb_Data[6] & kb_Enter)) kb_Scan();
+            while(!os_GetCSC());
             free(foundcluster.bubbles);
         }
         /*Debug: Change shooter color*/

@@ -1,0 +1,19 @@
+#Multi-byte integers stored LSB-first
+#Level pack file specification v0.1.0
+
+Level pack header:
+12 bytes: "BUBBLES!LPCK"
+3 bytes:  Version info (Major,Minor,Patch)
+1 byte:   Number of levels
+24 bytes: Pack name (e.g. "Killer Squids!"), padded with NULL
+Level:
+1 byte:    Max color (put "6" for 7 colors total)
+1 byte:    Shift rate
+1 byte:    Push down time
+3 bytes:   Random Seed
+25 bytes:  Null-terminated level name
+3x1 bytes: Starting bubble colors (first to last)
+1 byte:    Width/Cols
+1 byte:    Height/Rows
+3 bytes:   Number of bubbles (an int with the upper two bytes empty)
+(Number of bubbles * 4) bytes: Level Bubbles

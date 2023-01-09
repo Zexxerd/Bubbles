@@ -41,8 +41,7 @@ uint8_t pop_counter;// timer for pop animation
 bool fall_started;
 int ** fall_data;
 int fall_total;
-//bubble_list_t * floating_clusters;
-uint8_t fall_counter;// timer for pop animation
+uint8_t fall_counter;// timer for fall animation
 
 uint8_t game_flags;
 
@@ -125,6 +124,34 @@ bubble_list_t copyBubbleList(bubble_list_t original) { // deep copy
     }
     return new;
 }
+uint8_t * getAvailableColors(grid_t grid) {
+    //returns an EOF padded array, since 0 is a possibe color
+    uint8_t i,j,array_index;
+    bool is_in;
+    static uint8_t * availableColors;
+    if (availableColors == NULL) {
+        availableColors = (uint8_t *) malloc(7 * sizeof(bubble_t)); //max possible colors
+        if (availableColors == NULL) {
+            exit(1); //oooooooooops!
+        }
+    }
+    memset(availableColors,0xFF,7);
+    array_index = 0;
+    for (i = 0;i < grid.rows*grid.cols;i++) {
+        if (!(grid.bubbles[i].flags & EMPTY)) {
+            is_in = false;
+            for (j = 0;j < 7;j++) {
+                if (grid.bubbles[i].color == availableColors[j]) {
+                    is_in = true;
+                }
+            }
+        }
+        if (is_in) {
+            availableColors[array_index++] = grid.bubbles[i].color;
+        }
+    }
+    return availableColors;
+}
 void drawTile(uint8_t color,int x,int y) {
     if (color > max_color) return;
     gfx_TransparentSprite(bubble_sprites[color],x,y);
@@ -151,10 +178,10 @@ void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start) {
     if (!empty_row_start) empty_row_start = 1;
     for (i = 0;i<rows;i++) {
         for (j = 0;j<cols;j++) {
-            if (i >= empty_row_start-1) {
+            if (i >= empty_row_start - 1) {
                 grid.bubbles[(i*cols)+j] = newBubble(j,i,0,EMPTY);
             } else {
-                r = randInt(0,6);
+                r = randInt(0,max_color);
                 grid.bubbles[(i*cols)+j] = newBubble(j,i,r,0);
             }
         }
@@ -207,6 +234,7 @@ void move_proj(grid_t grid,shooter_t * shooter,float dt) {
     uint8_t i,j;
     uint8_t index; // uint8_t for now
     point_t coord,proj_coord; //x,y not col/row
+    //bubble_list_t neighbors;
     projectile_t * projectile = &shooter->projectile;
     projectile->x += dt * projectile->speed * sin(rad(projectile->angle));
     projectile->y -= dt * projectile->speed * cos(rad(projectile->angle));
@@ -242,17 +270,8 @@ void move_proj(grid_t grid,shooter_t * shooter,float dt) {
                         coord.x + (TILE_WIDTH>>1),
                         coord.y + (TILE_HEIGHT>>1),
                         grid.ball_diameter)) {
-                /*Debug: Highlight collision
-                 gfx_SetColor(10);
-                gfx_Circle(projectile->x,projectile->y,grid->ball_diameter>>1);
-                gfx_SetColor(20);
-                gfx_Circle(coord.x+grid->x,coord.y+grid->y,grid->ball_diameter>>1);
-                gfx_BlitBuffer();
-                while(!os_GetCSC());
-                 */
                 snapBubble(projectile,grid);
-                shooter->flags &= ~(ACTIVE_PROJ);
-                //free(projectile);
+                shooter->flags &= ~ACTIVE_PROJ;
                 return;
             }
         }
@@ -326,7 +345,7 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
                     }
                 }*/
                 for (i = 0;i < fall_total;i++) {
-                    grid.bubbles[fall_data[i][2] >> 8].flags &= ~FALLING;
+                    grid.bubbles[fall_data[i][3]].flags &= ~FALLING;
                     grid.bubbles[i].flags |= EMPTY;
                     free(fall_data[i]);
                 }
@@ -374,8 +393,7 @@ void resetProcessed(grid_t grid) {
         grid.bubbles[i].flags &= ~(PROCESSED);
     }
 }
-bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley) {
-    /*WORKING*/
+bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool check_empty) {
     uint8_t i;
     point_t neighbor;
     bubble_list_t neighbors;
@@ -391,15 +409,19 @@ bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley) {
     }
     
     // Get the neighbor offsets for the specified tile
-    //this_row_offsets = (int8_t **) neighbor_offsets[tilerow];
     // Get the neighbors
     for (i = 0;i < 6;i++) {
         // Neighbor coordinate
         neighbor.x = tilex + neighbor_offsets[tilerow][i][0];
         neighbor.y = tiley + neighbor_offsets[tilerow][i][1];
         // Make sure the tile is valid
-        if (neighbor.x >= 0 && neighbor.x < grid.cols && neighbor.y >= 0 && neighbor.y < grid.rows) {
-            neighbors_bubbles[neighbors.size++] = grid.bubbles[(neighbor.y*grid.cols)+neighbor.x];
+        if (neighbor.x >= 0 &&
+            neighbor.x < grid.cols &&
+            neighbor.y >= 0 &&
+            neighbor.y < grid.rows) {
+            if (!(grid.bubbles[(neighbor.y*grid.cols)+neighbor.x].flags & EMPTY) || check_empty) {
+                neighbors_bubbles[neighbors.size++] = grid.bubbles[(neighbor.y*grid.cols)+neighbor.x];
+            }
         }
     }
     neighbors.bubbles = neighbors_bubbles;
@@ -455,7 +477,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
             foundcluster.bubbles[foundcluster.size-1] = currenttile;
             foundcluster.size++;
             // Get the neighbors of the current tile
-            neighbors = getNeighbors(grid,currenttile.x,currenttile.y);
+            neighbors = getNeighbors(grid,currenttile.x,currenttile.y,true);
             // Check the type of each neighbor
             for (i = 0;i < neighbors.size;i++) {
                 if (!(neighbors.bubbles[i].flags & PROCESSED)) {
@@ -511,3 +533,49 @@ int findFloatingClusters(grid_t grid) { //rename to findFloatingBubbles?
     }
     return fall_total;
 }
+void addNewRow(grid_t grid) {
+    int i,j;
+    for (i = grid.rows-1;i > 0;i--) {
+        for (j=0;j < grid.cols;j++) {
+            grid.bubbles[(i * grid.cols) + j] = grid.bubbles[((i-1) * grid.cols) + j];
+        }
+    }
+    for (i = 0;i < grid.cols;i++) {
+        grid.bubbles[i] = newBubble(i,0,randInt(0,max_color),0);
+    }
+    row_offset ^= 1; //visual
+}
+/*
+bubble_list_t getPossibleCollisions(grid_t grid) {
+    int maxNeighbors;
+    int i;
+    for (i = 0;i < grid.rows * grid.cols;i++) {
+        maxNeighbors = 6;
+        if (grid.bubbles[i].x == 0) {
+            if (grid.bubbles[i].y == 0) {
+                maxNeighbors = 2 + row_offset;
+            } else {
+                maxNeighbors = ((grid.bubbles[i].y%2) == row_offset) ? 5 : 3;
+            }
+        } else if (grid.bubbles[i].x == grid.cols - 1) {
+            if (grid.bubbles[i].y == 0) {
+                maxNeighbors = 3 - row_offset;
+            } else {
+                maxNeighbors = ((grid.bubbles[i].y%2) == row_offset) ? 3 : 5;
+            }
+        }
+        if (grid.bubbles[i].x == 0 || grid.bubbles[i].x == grid.cols - 1) {
+            if ((grid.bubbles[i].y%2) == row_offset) {
+                maxNeighbors-=2;
+                if (grid.bubbles[i].x == 0)
+                    maxNeighbors--;
+            }
+            
+            maxNeighbors--;
+        }
+        if (grid.bubbles[i].y == 0 || grid.bubbles[i].y == grid.rows - 1) {
+            maxNeighbors-=2;
+        }
+    }
+}
+*/
