@@ -402,11 +402,11 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
                     }
                 }
             }
+        } else {
+            turn_counter++;
         }
         free(cluster.bubbles);
     }
-    if (!addtile)
-        turn_counter++;
 }
 void resetProcessed(grid_t grid) {
     int i;
