@@ -13,6 +13,7 @@
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
+#define MAX_POSSIBLE_COLOR 6 //max_color cannot exceed this
 
 //degrees to radians
 #define deg(a) (a * (180 / M_PI))
@@ -86,8 +87,8 @@ typedef struct bubble_list {
 } bubble_list_t;
 typedef struct grid {
     int x, y;  // left of level, top of level
-    uint8_t flags;
-    unsigned int score; //NOTE: create 48-bit type?
+    //uint8_t flags;
+    //unsigned int score; //NOTE: create 48-bit type?
     uint8_t ball_diameter;
     int width, height; //col * TILE_WIDTH, row * ROW_HEIGHT
     uint8_t cols;
@@ -125,14 +126,15 @@ void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);
 void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start);
+void addNewRow(grid_t grid,uint8_t chance);
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer);
 void renderShooter(shooter_t shooter);
 bool collide(float x1,float y1,float x2,float y2,uint8_t r);
 void snapBubble(projectile_t * projectile,grid_t grid);
-void move_proj(grid_t grid,shooter_t * shooter,float dt);
+void moveProj(grid_t grid,shooter_t * shooter,float dt);
 void resetProcessed(grid_t grid);
-bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool check_empty);
+bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool add_empty);
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
 int findFloatingClusters(grid_t grid);
-
+bubble_list_t getPossibleCollisions(grid_t grid);
 #endif // BUBBLE_H

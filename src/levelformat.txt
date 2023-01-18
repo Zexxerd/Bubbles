@@ -2,11 +2,13 @@
 #Level pack file specification v0.1.0
 
 Level pack header:
+Total size: 40
 12 bytes: "BUBBLES!LPCK"
 3 bytes:  Version info (Major,Minor,Patch)
 1 byte:   Number of levels
 24 bytes: Pack name (e.g. "Killer Squids!"), padded with NULL
 Level:
+Total size: 39
 1 byte:    Max color (put "6" for 7 colors total)
 1 byte:    Shift rate
 1 byte:    Push down time

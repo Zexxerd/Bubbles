@@ -45,6 +45,9 @@ level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
     int i;
     
     level.max_color = 0;
+    level.shift_rate = 0;
+    level.push_down_time = 0;
+    level.random_seed = 0;
     level.cols = level.rows = 0;
     level.data.size = 0;
     level.data.bubbles = NULL;
@@ -52,7 +55,6 @@ level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
     
     return_code = ti_Seek(PACK_HEADER_SIZE,SEEK_SET,file_handle);
     if (return_code == EOF) {
-        level.max_color = 0;
         strncpy(level.name,"BUBBLE START ERROR",25);
         return level;
     } //return "\0BUBSTAERROR\0"; //Fail to start search
@@ -119,7 +121,7 @@ uint8_t saveLevel(char filename[],level_t level,char pack_name[]) {
     return 0;
 }
 
-void debugTestOutput() {
+void debugTestOutput() { //used to compare with level editor export
     uint8_t i,j;
     level_t l;
     
