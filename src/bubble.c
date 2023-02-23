@@ -30,6 +30,9 @@ uint8_t row_offset; // 0: even row; 1: odd row
 uint8_t max_color;
 unsigned int player_score;
 unsigned int turn_counter;
+uint8_t * available_colors;
+bubble_list_t possible_collisions;
+
 
 bool debug_flag;
 char string[100];
@@ -115,7 +118,8 @@ bubble_t newBubble(uint8_t x,uint8_t y,uint8_t color,uint8_t flags) {
     return bubble;
 }
 
-bubble_list_t copyBubbleList(bubble_list_t original) { // deep copy
+bubble_list_t copyBubbleList(bubble_list_t original) {
+    // Get a deep copy of the original bubble list
     bubble_list_t new;
     new.size = original.size;
     new.bubbles = (bubble_t *) malloc(original.size * sizeof(bubble_t));
@@ -125,31 +129,56 @@ bubble_list_t copyBubbleList(bubble_list_t original) { // deep copy
     }
     return new;
 }
+
+uint8_t * extractColors(uint8_t color_byte) {
+    //extract colors from level.colors byte
+    //the returned array is in size + data format
+    static uint8_t * colors;
+    uint8_t i;
+    uint8_t index;
+    if (colors == NULL) {
+        colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR+2) * sizeof(uint8_t));
+        if (colors == NULL) {
+            exit(1); //ooooups!!
+        }
+    }
+    index = 1;
+    memset(colors,0xFF,(MAX_POSSIBLE_COLOR + 2));
+    for (i = 0;i < MAX_POSSIBLE_COLOR;i++) {
+        if (color_byte & (1 << i)) {
+            colors[index++] = i;
+        }
+    }
+    colors[0] = index - 1;
+    return colors;
+}
+
 uint8_t * getAvailableColors(grid_t grid) {
-    //Precondition, there is at least 1 color in here
+    //Precondition, there is at least 1 color in grid
+    //the returned array is in size + data format
     uint8_t i,j,array_index;
     bool is_in;
-    static uint8_t * availableColors;
-    if (availableColors == NULL) {
-        availableColors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR+2) * sizeof(uint8_t));
-        if (availableColors == NULL) {
+    static uint8_t * found_colors;
+    if (found_colors == NULL) {
+        found_colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR+2) * sizeof(uint8_t));
+        if (found_colors == NULL) {
             exit(1); //oooooooooops!
         }
     }
     
-    memset(availableColors,0xFF,(MAX_POSSIBLE_COLOR+2));
+    memset(found_colors,0xFF,(MAX_POSSIBLE_COLOR+2));
     array_index = 1;
     for (i = 0;i < grid.rows*grid.cols;i++) {
         is_in = false;
         if (!(grid.bubbles[i].flags & EMPTY)) {
             for (j = 1;j < array_index;j++) {
-                if (grid.bubbles[i].color == availableColors[j]) {
+                if (grid.bubbles[i].color == found_colors[j]) {
                     is_in = true;
                     break;
                 }
             }
             if (!is_in) {
-                availableColors[array_index++] = grid.bubbles[i].color;
+                found_colors[array_index++] = grid.bubbles[i].color;
                 if (array_index > (MAX_POSSIBLE_COLOR+2)) {
                     dbg_printf("Invalid!!I!*!@(#U!@I@IUewq array_index %d",array_index);
                     exit(1);
@@ -157,8 +186,8 @@ uint8_t * getAvailableColors(grid_t grid) {
             }
         }
     }
-    availableColors[0] = array_index - 1;
-    return availableColors;
+    found_colors[0] = array_index - 1;
+    return found_colors;
 }
 void drawTile(uint8_t color,int x,int y) {
     if (color > max_color) return;
@@ -178,8 +207,8 @@ point_t getGridPosition(int x,int y) {
     temp.x = (x - (((temp.y + row_offset) % 2) ? TILE_WIDTH >> 1 : 0)) / TILE_WIDTH;
     return temp;
 }
-void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start) {
-    /*example: initGrid(grid,16,7,15) for a 16*7 grid with the 15th and 16th (from 1st) rows empty*/
+void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint8_t * available_colors) {
+    /*example: initGrid(grid,16,7,15) for a 16*7 grid with the 15th and 16th rows empty*/
     uint8_t i,j,r;
 //  point_t p = {0, 0};//getGridPosition(grid->x,grid->y);
     r = 0;
@@ -189,22 +218,32 @@ void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start) {
             if (i >= empty_row_start - 1) {
                 grid.bubbles[(i*cols)+j] = newBubble(j,i,0,EMPTY);
             } else {
-                r = randInt(0,max_color);
+                if (available_colors) {
+                    r = available_colors[randInt(1,available_colors[0])];
+                } else {
+                    r = randInt(0,max_color);
+                }
                 grid.bubbles[(i*cols)+j] = newBubble(j,i,r,0);
             }
         }
     }
 }
 
-void addNewRow(grid_t grid,uint8_t chance) {
+void addNewRow(grid_t grid,uint8_t * available_colors,uint8_t chance) {
     uint8_t i,j;
+    row_offset ^= 1;
     for (i = grid.rows-1;i;i--) {
-        for (j = grid.cols-1;j;j--) {
-            grid.bubbles[i * grid.cols + j] = grid.bubbles[(i-1) * grid.cols + j];
+        for (j = grid.cols;j;j--) {
+            grid.bubbles[i * grid.cols + (j - 1)] = grid.bubbles[(i-1) * grid.cols + (j - 1)];
+            grid.bubbles[i * grid.cols + (j - 1)].y++;
         }
     }
     for (j = 0;j < grid.cols;j++) {
-        grid.bubbles[j] = newBubble(j,0,randInt(0,max_color),(randInt(0,9) > chance) * EMPTY);
+        if (available_colors) {
+            grid.bubbles[j] = newBubble(j,0,available_colors[randInt(1,available_colors[0])],(randInt(1,10) > chance) ? EMPTY : 0);
+        } else {
+            grid.bubbles[j] = newBubble(j,0,randInt(0,max_color),(randInt(1,10) > chance) ? EMPTY : 0);
+        }
     }
 }
 
@@ -232,7 +271,7 @@ void renderShooter(shooter_t shooter) {
     point_t center;
     center.x = shooter.x + (TILE_WIDTH >> 1);
     center.y = shooter.y + (TILE_HEIGHT >> 1);
-    gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]],255-(rtc_Time()%3));
+    gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]],255-(timer_1_Counter%3));
     gfx_SetColor(shooter.pal_index);
     //gfx_FillCircle(center.x,center.y,TILE_WIDTH>>1);
     gfx_Line(center.x,center.y,center.x + (1.5 * TILE_WIDTH) * sin(rad(shooter.angle)),center.y - (1.5 * TILE_HEIGHT) * cos(rad(shooter.angle)));
@@ -251,8 +290,8 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
     return (dist < r);
 }
 void moveProj(grid_t grid,shooter_t * shooter,float dt) {
-    uint8_t i,j;
-    uint8_t index; // uint8_t for now
+    uint8_t i;
+    //uint8_t index;
     point_t coord,proj_coord; //x,y not col/row
     //bubble_list_t neighbors;
     projectile_t * projectile = &shooter->projectile;
@@ -277,7 +316,19 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
     if (proj_coord.x > grid.width || proj_coord.y > grid.height) {
         return;
     }
-    for (i = 0;i < grid.rows;i++) {
+    for (i = 0;i < possible_collisions.size;i++) {
+        coord = getTileCoordinate(possible_collisions.bubbles[i].x, possible_collisions.bubbles[i].y);
+        if (collide(proj_coord.x + (TILE_WIDTH>>1),
+                    proj_coord.y + (TILE_HEIGHT>>1),
+                    coord.x + (TILE_WIDTH>>1),
+                    coord.y + (TILE_HEIGHT>>1),
+                    grid.ball_diameter)) {
+            snapBubble(projectile,grid);
+            shooter->flags &= ~ACTIVE_PROJ;
+            return;
+        }
+    }
+    /*for (i = 0;i < grid.rows;i++) {
         for (j = 0;j < grid.cols;j++) {
             index = i*grid.cols+j;
             if (grid.bubbles[index].flags & EMPTY) {
@@ -294,7 +345,7 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
                 return;
             }
         }
-    }
+    }*/
 }
 void snapBubble(projectile_t * projectile,grid_t grid) {
     bool addtile;
@@ -404,6 +455,9 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
             }
         } else {
             turn_counter++;
+            if (!(turn_counter % 5)) {
+                addNewRow(grid,available_colors,9);
+            }
         }
         free(cluster.bubbles);
     }
@@ -467,7 +521,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
     
     // Initialize the toprocess array with the specified tile
     if (toprocess.bubbles == NULL) {
-        if ((toprocess.bubbles = (bubble_t *) malloc((grid.rows)*grid.cols*sizeof(bubble_t))) == NULL)
+        if ((toprocess.bubbles = (bubble_t *) malloc((grid.rows)*grid.cols*sizeof(bubble_t))) == NULL) // malloc(256*sizeof(bubble_t))
             exit(1); //oopsie doopsie!
     }
     
@@ -555,7 +609,7 @@ int findFloatingClusters(grid_t grid) { //rename to findFloatingBubbles?
     return fall_total;
 }
 bubble_list_t getPossibleCollisions(grid_t grid) {
-    //Uses neighbors to deduce whether a collision is possible, reducing time spent calculating collisions
+    //Uses neighbors to deduce whether a collision is possible, reducing time spent calculating projectile collisions
     uint8_t i;
     static bubble_list_t possible_collisions;
     possible_collisions.size = 0;
@@ -568,9 +622,8 @@ bubble_list_t getPossibleCollisions(grid_t grid) {
     
     for (i = 0;i < grid.rows * grid.cols;i++) {
         if (!(grid.bubbles[i].flags & EMPTY)) {
-            if (getNeighbors(grid,i%grid.cols,i/grid.cols,true).size != getNeighbors(grid,i%grid.cols,i/grid.cols,false).size) {
-                possible_collisions.bubbles[i] = grid.bubbles[i];
-                possible_collisions.size++;
+            if (getNeighbors(grid,grid.bubbles[i].x,grid.bubbles[i].y,true).size != getNeighbors(grid,grid.bubbles[i].x,grid.bubbles[i].y,false).size) {
+                possible_collisions.bubbles[possible_collisions.size++] = grid.bubbles[i];
             }
         }
     }

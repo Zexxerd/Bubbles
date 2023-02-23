@@ -13,7 +13,7 @@
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
-#define MAX_POSSIBLE_COLOR 6 //max_color cannot exceed this
+#define MAX_POSSIBLE_COLOR 6 // highest possible index of max_color
 
 //degrees to radians
 #define deg(a) (a * (180 / M_PI))
@@ -125,8 +125,8 @@ uint8_t * getAvailableColors(grid_t grid);
 void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);
-void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start);
-void addNewRow(grid_t grid,uint8_t chance);
+void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint8_t * available_colors);
+void addNewRow(grid_t grid,uint8_t * available_colors,uint8_t chance);
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer);
 void renderShooter(shooter_t shooter);
 bool collide(float x1,float y1,float x2,float y2,uint8_t r);

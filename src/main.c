@@ -24,6 +24,9 @@
  Note: Pop bubbles before checking deadzone.
  */
 
+/**
+ TODO: Mark this mode as survival;
+ */
 #ifndef TILE_WIDTH
 #define TILE_WIDTH 16
 #endif
@@ -35,6 +38,7 @@
 
 extern uint8_t row_offset; // 0: even row shifted; 1: odd row shifted
 extern uint8_t max_color;
+extern uint8_t * available_colors;
 
 extern uint8_t game_flags; //global because our grid is no longer a pointer
 extern unsigned int player_score;
@@ -45,6 +49,8 @@ extern bool debug_flag;
 extern gfx_sprite_t * bubble_sprites[7];
 extern gfx_sprite_t * bubble_pop_sprites[7];
 extern const uint16_t bubble_colors[7];
+
+extern bubble_list_t possible_collisions;
 
 extern bool pop_started;
 extern int ** pop_locations;
@@ -78,8 +84,10 @@ int main(void) {
     point_t debug_point;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
+    //debugTestRead();
 #endif //DEBUG
-    
+    //return 0;
+
     shooter_t shooter;
     grid_t grid;
     gfx_sprite_t * grid_buffer;
@@ -87,7 +95,6 @@ int main(void) {
     gfx_sprite_t * pop_sprite;
     gfx_sprite_t * pop_sprite_rotations[3];
 
-    uint8_t * available_colors;
     max_color = 6;
     turn_counter = 0;
     player_score = 0;
@@ -136,16 +143,19 @@ int main(void) {
     //declare an image buffer for the grid
     grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * grid.rows + (TILE_WIDTH>>2));
     if (grid_buffer == NULL) exit(1);
-    //declare image buffers for
     
     srand(rtc_Time());
-    initGrid(grid,grid.rows,grid.cols,10);
+    initGrid(grid,grid.rows,grid.cols,10,NULL);
+    available_colors = getAvailableColors(grid);
+    possible_collisions = getPossibleCollisions(grid);
+    
     gfx_palette[255] = 0xFFFF;
     gfx_Begin();
     gfx_SetDrawBuffer();
     gfx_SetPalette(bubble_pal,sizeof_bubble_pal,0);
     gfx_SetPalette(bubble_colors,14,sizeof_bubble_pal>>1);
     row_offset = 0;
+    
     
     x = y = 0;
     strcpy(fps_string,"FPS: ");
@@ -157,7 +167,6 @@ int main(void) {
     timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
     
     highlight_timer = 0;
-    
     /*Main game*/
     
     while (!(kb_Data[6] & kb_Clear)) {
@@ -186,26 +195,25 @@ int main(void) {
         /*Shoot bubbles*/
         if (kb_Data[1] & kb_2nd) {
             if (!(shooter.flags & ACTIVE_PROJ)) {
-                shooter.projectile.x = shooter.x;
-                shooter.projectile.y = shooter.y;
-                shooter.projectile.angle = shooter.angle;
-                shooter.projectile.color = shooter.next_bubbles[0];
-                shooter.next_bubbles[0] = shooter.next_bubbles[1];
-                shooter.next_bubbles[1] = shooter.next_bubbles[2];
-                available_colors = getAvailableColors(grid);
-                shooter.next_bubbles[2] = available_colors[1 + randInt(0, available_colors[0]-1)];
-#ifdef DEBUG
-                gfx_FillScreen(255);
-                gfx_PrintStringXY("Size: ",0,0);
-                gfx_PrintUIntXY(available_colors[0],8,48,0);
-                for (j = 0;j < available_colors[0];j++) {
-                    gfx_PrintUIntXY(available_colors[j+1],8,120,16+j*8);
+                possible_collisions = getPossibleCollisions(grid);
+                if (possible_collisions.size) {
+                    shooter.projectile.x = shooter.x;
+                    shooter.projectile.y = shooter.y;
+                    shooter.projectile.angle = shooter.angle;
+                    shooter.projectile.color = shooter.next_bubbles[0];
+                    shooter.next_bubbles[0] = shooter.next_bubbles[1];
+                    shooter.next_bubbles[1] = shooter.next_bubbles[2];
+                    available_colors = getAvailableColors(grid);
+                    if (!available_colors[0]) {
+                        available_colors[0] = 1;
+                        available_colors[1] = 0;
+                    }
+                    shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
+                    shooter.flags |= ACTIVE_PROJ;
+                    shooter.projectile.visible = true;
+                } else {
+                    //none
                 }
-                gfx_BlitBuffer();
-                while(!os_GetCSC());
-#endif //DEBUG
-                shooter.flags |= ACTIVE_PROJ;
-                shooter.projectile.visible = true;
             }
         }
         if (game_flags & POP) {
@@ -373,6 +381,28 @@ int main(void) {
             gfx_BlitBuffer();
             while(!os_GetCSC());
         }
+        if (kb_Data[4] & kb_Prgm) {
+            gfx_FillScreen(255);
+            gfx_PrintStringXY("Size: ",0,0);
+            gfx_PrintUIntXY(available_colors[0],8,48,0);
+            for (j = 0;j < available_colors[0];j++) {
+                gfx_PrintUIntXY(available_colors[j+1],8,120,16+j*8);
+            }
+            gfx_BlitBuffer();
+            while(!os_GetCSC());
+        }
+        if (kb_Data[5] & kb_Vars) {
+            gfx_FillScreen(255);
+            possible_collisions = getPossibleCollisions(grid);
+            for (i = 0;i < possible_collisions.size;i++) {
+                point = getTileCoordinate(possible_collisions.bubbles[i].x,possible_collisions.bubbles[i].y);
+                point.x += grid.x;
+                point.y += grid.y;
+                drawTile(possible_collisions.bubbles[i].color,point.x,point.y);
+            }
+            gfx_BlitBuffer();
+            while (!os_GetCSC());
+        }
 #endif //DEBUG
         //Move the projectile
         if (shooter.flags & ACTIVE_PROJ) {
@@ -386,10 +416,13 @@ int main(void) {
         gfx_TransparentSprite(grid_buffer,grid.x,grid.y); //grid
         gfx_SetColor(0);
         gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
-        gfx_SetTextXY(0,32);
-        gfx_PrintString("Score: ");
+        gfx_PrintStringXY("Turn:",0,24);
+        gfx_PrintUIntXY(turn_counter,3,48,24);
+
+        gfx_PrintStringXY("Score: ",0,32);
         gfx_SetTextXY(60,32);
         gfx_PrintInt(player_score,5);
+        
         
 #ifdef DEBUG
         /*Draw a highlight for the highlighted square*/
@@ -404,8 +437,6 @@ int main(void) {
         gfx_PrintStringXY("Y:",0,8);
         gfx_PrintUIntXY(x,2,20,0);
         gfx_PrintUIntXY(y,2,20,8);
-        gfx_PrintStringXY("Turn:",0,24);
-        gfx_PrintUIntXY(turn_counter,3,48,24);
         if (game_flags & RENDER) {
             gfx_PrintStringXY("game:RENDER",0,40);
         }
