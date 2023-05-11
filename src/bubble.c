@@ -15,21 +15,14 @@
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
 #define deg(a) (a * (180 / M_PI))
 #define rad(a) (a * (M_PI / 180))
-//tiles
-#define PROCESSED (1<<0)
-#define REMOVED   (1<<1)
-#define EMPTY     (1<<2)
-#define POPPING   (1<<3)
-#define FALLING   (1<<4)
-//shooter
-#define ACTIVE_PROJ (1<<0)
-#define DEACTIVATED (1<<1)
 
 /*Globals*/
 uint8_t row_offset; // 0: even row; 1: odd row
 uint8_t max_color;
 unsigned int player_score;
 unsigned int turn_counter;
+unsigned int push_down_time;
+uint8_t shift_rate;
 uint8_t * available_colors;
 bubble_list_t possible_collisions;
 
@@ -130,29 +123,18 @@ bubble_list_t copyBubbleList(bubble_list_t original) {
     return new;
 }
 
-uint8_t * extractColors(uint8_t color_byte) {
-    //extract colors from level.colors byte
-    //the returned array is in size + data format
-    static uint8_t * colors;
-    uint8_t i;
-    uint8_t index;
-    if (colors == NULL) {
-        colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR+2) * sizeof(uint8_t));
-        if (colors == NULL) {
-            exit(1); //ooooups!!
+void setAvailableColors(uint8_t * target,uint8_t colors) {
+    //Precondition: target is an 8-element uint8_t array
+    uint8_t i, size;
+    size = 0;
+    memset(target,0xFF,MAX_POSSIBLE_COLOR + 2);
+    for (i = 0;i < sizeof(uint8_t) * 7;i++) {
+        if (colors & (1<<i)) {
+            target[++size] = i;
         }
     }
-    index = 1;
-    memset(colors,0xFF,(MAX_POSSIBLE_COLOR + 2));
-    for (i = 0;i < MAX_POSSIBLE_COLOR;i++) {
-        if (color_byte & (1 << i)) {
-            colors[index++] = i;
-        }
-    }
-    colors[0] = index - 1;
-    return colors;
+    target[0] = size;
 }
-
 uint8_t * getAvailableColors(grid_t grid) {
     //Precondition, there is at least 1 color in grid
     //the returned array is in size + data format
@@ -189,6 +171,7 @@ uint8_t * getAvailableColors(grid_t grid) {
     found_colors[0] = array_index - 1;
     return found_colors;
 }
+
 void drawTile(uint8_t color,int x,int y) {
     if (color > max_color) return;
     gfx_TransparentSprite(bubble_sprites[color],x,y);
@@ -207,6 +190,7 @@ point_t getGridPosition(int x,int y) {
     temp.x = (x - (((temp.y + row_offset) % 2) ? TILE_WIDTH >> 1 : 0)) / TILE_WIDTH;
     return temp;
 }
+
 void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint8_t * available_colors) {
     /*example: initGrid(grid,16,7,15) for a 16*7 grid with the 15th and 16th rows empty*/
     uint8_t i,j,r;
@@ -247,8 +231,20 @@ void addNewRow(grid_t grid,uint8_t * available_colors,uint8_t chance) {
     }
 }
 
+void pushDown(grid_t * grid) {
+    uint8_t i,j;
+    dbg_printf("Pushing down");
+    if (grid->rows > 2)
+        grid->rows--;
+    grid->y += ROW_HEIGHT;
+    grid->height -= ROW_HEIGHT;
+    game_flags |= RENDER;
+}
+
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
     /*Uses the drawing buffer to render the grid to the grid_buffer sprite. This sprite can be drawn later as many times as needed.*/
+    /*Precondition: grid.cols is less than 20 (LCD_WIDTH/TILE_WIDTH)
+                    grid.rows is less than 20 (LCD_HEIGHT/ROW_HEIGHT)*/
     int i,j;
     bubble_t tile;
     point_t coord;
@@ -258,9 +254,7 @@ void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
             tile = grid.bubbles[(i*grid.cols)+j];
             if (tile.flags & EMPTY) continue; //skip if empty
             coord = getTileCoordinate(j,i);
-//            coord.x += grid.x;
-//            coord.y += grid.y;
-            drawTile(tile.color,coord.x,coord.y);
+            gfx_TransparentSprite_NoClip(bubble_sprites[tile.color],coord.x,coord.y);
         }
     }
     grid_buffer->width  = grid.cols * TILE_WIDTH + (TILE_WIDTH>>1);
@@ -291,9 +285,7 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
 }
 void moveProj(grid_t grid,shooter_t * shooter,float dt) {
     uint8_t i;
-    //uint8_t index;
     point_t coord,proj_coord; //x,y not col/row
-    //bubble_list_t neighbors;
     projectile_t * projectile = &shooter->projectile;
     projectile->x += dt * projectile->speed * sin(rad(projectile->angle));
     projectile->y -= dt * projectile->speed * cos(rad(projectile->angle));
@@ -309,9 +301,9 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
         projectile->x = proj_coord.x + grid.x;
     }
     if (proj_coord.y <= 0) {
-        projectile->y = 0; //grid.y
+        projectile->y = grid.y; //grid.y
         snapBubble(projectile, grid);
-        shooter->flags &= ~(ACTIVE_PROJ);
+        shooter->flags &= ~ACTIVE_PROJ;
     }
     if (proj_coord.x > grid.width || proj_coord.y > grid.height) {
         return;
@@ -455,8 +447,12 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
             }
         } else {
             turn_counter++;
-            if (!(turn_counter % 5)) {
-                addNewRow(grid,available_colors,9);
+            if (!(turn_counter % shift_rate)) {
+                if (turn_counter <= push_down_time) {
+                    addNewRow(grid,available_colors,9);
+                } else {
+                    game_flags |= PUSHDOWN;
+                }
             }
         }
         free(cluster.bubbles);

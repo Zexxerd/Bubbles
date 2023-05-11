@@ -68,6 +68,7 @@ level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
     level.shift_rate = 0;
     level.push_down_time = 0;
     level.random_seed = 0;
+    level.colors = 0;
     level.cols = level.rows = 0;
     level.data.size = 0;
     level.data.bubbles = NULL;
@@ -149,6 +150,7 @@ void debugTestOutput() { //used to compare with level editor export
     l.shift_rate = 5;
     l.push_down_time = 25;
     l.random_seed = 0x10312d;
+    l.colors = 0x7F;
     l.starting_bubbles[0] = 3;
     l.starting_bubbles[1] = 6;
     l.starting_bubbles[2] = 1;

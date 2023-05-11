@@ -41,6 +41,7 @@
 #define NEW_ROW  (1<<1) // ^^
 #define POP      (1<<2) // Bubbles are popping.
 #define FALL     (1<<3) // Falling bubbles, wear a helmet
+#define PUSHDOWN (1<<4) // Level has run out of bubbles, go down
 
 /*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) do { \
@@ -121,17 +122,19 @@ char * uint8_to_bin(uint8_t n);
 
 bubble_t newBubble(uint8_t x,uint8_t y,uint8_t color,uint8_t flags);
 bubble_list_t copyBubbleList(bubble_list_t original);
+void setAvailableColors(uint8_t * target,uint8_t colors);
 uint8_t * getAvailableColors(grid_t grid);
 void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);
 void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint8_t * available_colors);
 void addNewRow(grid_t grid,uint8_t * available_colors,uint8_t chance);
+void pushDown(grid_t * grid);
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer);
 void renderShooter(shooter_t shooter);
 bool collide(float x1,float y1,float x2,float y2,uint8_t r);
-void snapBubble(projectile_t * projectile,grid_t grid);
 void moveProj(grid_t grid,shooter_t * shooter,float dt);
+void snapBubble(projectile_t * projectile,grid_t grid);
 void resetProcessed(grid_t grid);
 bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool add_empty);
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);

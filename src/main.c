@@ -40,9 +40,12 @@ extern uint8_t row_offset; // 0: even row shifted; 1: odd row shifted
 extern uint8_t max_color;
 extern uint8_t * available_colors;
 
-extern uint8_t game_flags; //global because our grid is no longer a pointer
+extern uint8_t game_flags; //global because our grid no longer holds it
+extern uint8_t shift_rate;
 extern unsigned int player_score;
 extern unsigned int turn_counter;
+extern unsigned int push_down_time;
+
 
 extern bool debug_flag;
 
@@ -62,31 +65,34 @@ extern int ** fall_data;
 extern int fall_total;
 extern uint8_t fall_counter;
 
-char * printfloat(float elapsed) {
+static char * printfloat(float elapsed) {
     real_t elapsed_real;
     static char str[10];
     elapsed_real = os_FloatToReal(elapsed <= 0.001f ? 0.0f : elapsed);
     os_RealToStr(str, &elapsed_real, 8, 1, 2);
     return str;
 }
+
 int main(void) {
     uint8_t x,y;
     int i,j,k; //universal counter
     point_t point;
 
+    bool lost;
     uint8_t highlight_timer;
     uint8_t fps_counter;
     uint8_t fps_ratio;
     float fps, last_fps, ticks;
     char * fps_string;
+    
 #ifdef DEBUG
     int debug_fall_total;
     point_t debug_point;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
     //debugTestRead();
-#endif //DEBUG
     //return 0;
+#endif //DEBUG
 
     shooter_t shooter;
     grid_t grid;
@@ -95,13 +101,19 @@ int main(void) {
     gfx_sprite_t * pop_sprite;
     gfx_sprite_t * pop_sprite_rotations[3];
 
+    gfx_sprite_t * lose_animation_behind;
+    char lose_string[] = "You Lose!";
+    
     max_color = 6;
+    shift_rate = 5;
     turn_counter = 0;
     player_score = 0;
     x = y = 0;
     fps = last_fps = 30;
     fps_string = malloc(15);
-
+    //debug
+    push_down_time = 6;
+    
     //popping animation sprites
     pop_counter = 0;
     pop_started = false;
@@ -124,11 +136,11 @@ int main(void) {
     for (i = 0;i < 3;i++)
         shooter.next_bubbles[i] = randInt(0,max_color);
     shooter.flags = 0x00;
-    
     shooter.projectile.x = 0;
     shooter.projectile.y = 0;
     shooter.projectile.color = shooter.next_bubbles[0];
     shooter.projectile.angle = 0;
+    
     //grid
     grid.cols = 7;
     grid.rows = 17; //16 + deadzone
@@ -140,13 +152,15 @@ int main(void) {
     grid.height = (ROW_HEIGHT * grid.rows) + (TILE_WIDTH>>2);
     grid.bubbles = (bubble_t *) malloc((grid.cols*grid.rows) * sizeof(bubble_t));
     if (grid.bubbles == NULL) exit(1);
+    
     //declare an image buffer for the grid
     grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * grid.rows + (TILE_WIDTH>>2));
     if (grid_buffer == NULL) exit(1);
     
     srand(rtc_Time());
+    available_colors = (uint8_t *) malloc(8*sizeof(uint8_t));
+    setAvailableColors(available_colors,0x7F);
     initGrid(grid,grid.rows,grid.cols,10,NULL);
-    available_colors = getAvailableColors(grid);
     possible_collisions = getPossibleCollisions(grid);
     
     gfx_palette[255] = 0xFFFF;
@@ -167,31 +181,37 @@ int main(void) {
     timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
     
     highlight_timer = 0;
+    lost = false;
     /*Main game*/
     
     while (!(kb_Data[6] & kb_Clear)) {
+        if (lost) break;
         if (game_flags & RENDER) {
-            //gfx_SetDrawBuffer();
             renderGrid(grid,grid_buffer);
-            //dbg_printf("Location of grid_buffer: %x\n\n",(unsigned int) &grid_buffer);
             game_flags &= ~RENDER;
         }
         gfx_FillScreen(255);  //Change render method (speed!)
         kb_Scan();
         if (kb_Data[7] & kb_Left) {
+#if DEBUG
             x -= (x > 0);
+#endif
             if (shooter.angle > LBOUND)
                 shooter.angle-=4;
         }
         if (kb_Data[7] & kb_Right) {
+#if DEBUG
             x += (x < grid.cols-1);
+#endif
             if (shooter.angle < RBOUND)
                 shooter.angle+=4;
         }
+#if DEBUG
         if (kb_Data[7] & kb_Up)
             y -= (y > 0);
         if (kb_Data[7] & kb_Down)
             y += (y < grid.rows-1);
+#endif
         /*Shoot bubbles*/
         if (kb_Data[1] & kb_2nd) {
             if (!(shooter.flags & ACTIVE_PROJ)) {
@@ -300,6 +320,10 @@ int main(void) {
                 free(fall_data);
             }
         }
+        if (game_flags & PUSHDOWN) {
+            pushDown(&grid);
+            game_flags &= ~PUSHDOWN;
+        }
 #ifdef DEBUG
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
@@ -381,16 +405,18 @@ int main(void) {
             gfx_BlitBuffer();
             while(!os_GetCSC());
         }
+        /*Debug: Available colors*/
         if (kb_Data[4] & kb_Prgm) {
             gfx_FillScreen(255);
             gfx_PrintStringXY("Size: ",0,0);
-            gfx_PrintUIntXY(available_colors[0],8,48,0);
+            gfx_PrintUIntXY(available_colors[0],1,48,0);
             for (j = 0;j < available_colors[0];j++) {
                 gfx_PrintUIntXY(available_colors[j+1],8,120,16+j*8);
             }
             gfx_BlitBuffer();
             while(!os_GetCSC());
         }
+        /*Debug: Possible collisions*/
         if (kb_Data[5] & kb_Vars) {
             gfx_FillScreen(255);
             possible_collisions = getPossibleCollisions(grid);
@@ -403,13 +429,26 @@ int main(void) {
             gfx_BlitBuffer();
             while (!os_GetCSC());
         }
+        if (kb_Data[2] & kb_Recip) {
+            pushDown(&grid);
+            while(!os_GetCSC());
+        }
 #endif //DEBUG
         //Move the projectile
         if (shooter.flags & ACTIVE_PROJ) {
             fps_ratio = (uint8_t) (fps/last_fps);
             fps_ratio = fps_ratio || 1;
             moveProj(grid,&shooter,fps_ratio << 1);
-            gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
+            if (shooter.projectile.visible) {
+                gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
+            }
+            if (!(shooter.flags & ACTIVE_PROJ)) {
+                for (i=0;i<grid.cols;i++) {
+                    if (!(grid.bubbles[grid.cols*(grid.rows-1)+i].flags & EMPTY)) {
+                        lost = true;
+                    }
+                }
+            }
         }
         //Display
         renderShooter(shooter);
@@ -418,9 +457,11 @@ int main(void) {
         gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
         gfx_PrintStringXY("Turn:",0,24);
         gfx_PrintUIntXY(turn_counter,3,48,24);
+        gfx_PrintStringXY("Push time:",0,32);
+        gfx_PrintUIntXY(push_down_time,3,72,32);
 
-        gfx_PrintStringXY("Score: ",0,32);
-        gfx_SetTextXY(60,32);
+        gfx_PrintStringXY("Score: ",0,40);
+        gfx_SetTextXY(60,40);
         gfx_PrintInt(player_score,5);
         
         
@@ -430,7 +471,7 @@ int main(void) {
             gfx_SetColor(5);
             debug_point = getTileCoordinate(x,y);
             gfx_FillRectangle(grid.x+debug_point.x,grid.y+debug_point.y,TILE_WIDTH,TILE_HEIGHT);
-            drawTile(grid.bubbles[y * grid.cols + x].color,grid.x+debug_point.x,debug_point.y);
+            drawTile(grid.bubbles[y * grid.cols + x].color,grid.x+debug_point.x,grid.y+debug_point.y);
         }
         highlight_timer++;
         gfx_PrintStringXY("X:",0,0);
@@ -452,8 +493,7 @@ int main(void) {
 #endif //DEBUG
         //FPS
         gfx_PrintStringXY(fps_string,0,232);
-        fps_counter++;
-        if (fps_counter == 7) {
+        if (++fps_counter == 7) {
             ticks = (float)atomic_load_increasing_32(&timer_1_Counter) / 32768;
             last_fps = fps;
             fps =  7.0 / ticks;
@@ -466,8 +506,39 @@ int main(void) {
         gfx_SetTextFGColor(0);
         gfx_BlitBuffer(); //render the whole thing
     }
-    game_flags = 0;
-    shooter.flags = 0;
+    if (lost) {
+        //init partial redraw
+        k = 1;
+        i = gfx_GetStringWidth(lose_string);
+        lose_animation_behind = gfx_MallocSprite(i,k<<3);
+        point.x = (LCD_WIDTH>>1)-(i>>1);
+        point.y = (LCD_HEIGHT>>1)-(4*k);
+        gfx_SetDrawScreen();
+        gfx_GetSprite(lose_animation_behind,point.x,point.y);
+        gfx_PrintStringXY(lose_string,point.x,point.y);
+        while (k < 5) {
+            timer_Control = TIMER1_DISABLE;
+            timer_1_Counter = 0;
+            timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
+            while (timer_1_Counter < 2730);
+            k++;
+            //clear old background
+            gfx_Sprite(lose_animation_behind,point.x,point.y);
+            free(lose_animation_behind);
+            //movement code
+            gfx_SetTextScale(k,k);
+            i = gfx_GetStringWidth(lose_string);
+            lose_animation_behind = gfx_MallocSprite(i,k<<3);
+            point.x = (LCD_WIDTH>>1)-(i>>1);
+            point.y = (LCD_HEIGHT>>1)-(4*k);
+            //get new background and print new sprite/string
+            gfx_GetSprite(lose_animation_behind,point.x,point.y);
+            gfx_PrintStringXY(lose_string,point.x,point.y);
+        }
+        while (!os_GetCSC());
+    }
+    game_flags = 0x00;
+    shooter.flags = 0x00;
     shooter.projectile.x = shooter.projectile.y = shooter.projectile.speed = shooter.projectile.color = 0;
     free(grid.bubbles);
     gfx_End();
