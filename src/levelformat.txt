@@ -1,4 +1,4 @@
-#Multi-byte integers stored LSB-first
+#Multi-byte integers stored LSB-first (as per TI-84+CE internal standards)
 #Level pack file specification v0.1.0
 
 Level pack header:
@@ -19,4 +19,5 @@ Total size: 40
 1 byte:    Width/Cols
 1 byte:    Height/Rows
 3 bytes:   Number of bubbles (an int with the upper two bytes empty)
+Bubbles:
 (Number of bubbles * 4) bytes: Level Bubbles

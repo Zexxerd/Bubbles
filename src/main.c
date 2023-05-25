@@ -510,13 +510,13 @@ int main(void) {
         //init partial redraw
         k = 1;
         i = gfx_GetStringWidth(lose_string);
-        lose_animation_behind = gfx_MallocSprite(i,k<<3);
+        lose_animation_behind = gfx_MallocSprite(i,8);
         point.x = (LCD_WIDTH>>1)-(i>>1);
-        point.y = (LCD_HEIGHT>>1)-(4*k);
+        point.y = (LCD_HEIGHT>>1)-4;
         gfx_SetDrawScreen();
         gfx_GetSprite(lose_animation_behind,point.x,point.y);
         gfx_PrintStringXY(lose_string,point.x,point.y);
-        while (k < 5) {
+        while (k < 4) {
             timer_Control = TIMER1_DISABLE;
             timer_1_Counter = 0;
             timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
