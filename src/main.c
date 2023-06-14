@@ -430,9 +430,23 @@ int main(void) {
             gfx_BlitBuffer();
             while (!os_GetCSC());
         }
+        /*Debug: Pushdown*/
         if (kb_Data[2] & kb_Recip) {
             pushDown(&grid);
             while(!os_GetCSC());
+        }
+        /*Debug: Shift Rate*/
+        if (kb_Data[3] & kb_Sin) {
+            shift_rate--;
+        }
+        if (kb_Data[4] & kb_Cos) {
+            shift_rate++;
+        }
+        if (kb_Data[5] & kb_Tan) {
+            push_down_time--;
+        }
+        if (kb_Data[6] & kb_Power) {
+            push_down_time++;
         }
 #endif //DEBUG
         //Move the projectile
@@ -456,11 +470,13 @@ int main(void) {
         gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
         gfx_PrintStringXY("Turn:",0,24);
         gfx_PrintUIntXY(turn_counter,3,48,24);
-        gfx_PrintStringXY("Push time:",0,32);
-        gfx_PrintUIntXY(push_down_time,3,72,32);
+        gfx_PrintStringXY("Shift rate:",0,32);
+        gfx_PrintUIntXY(shift_rate,3,72,32);
+        gfx_PrintStringXY("Push time:",0,40);
+        gfx_PrintUIntXY(push_down_time,3,72,40);
 
-        gfx_PrintStringXY("Score: ",0,40);
-        gfx_SetTextXY(60,40);
+        gfx_PrintStringXY("Score: ",0,48);
+        gfx_SetTextXY(60,48);
         gfx_PrintInt(player_score,5);
         
         
@@ -478,20 +494,23 @@ int main(void) {
         gfx_PrintUIntXY(x,2,20,0);
         gfx_PrintUIntXY(y,2,20,8);
         if (game_flags & RENDER) {
-            gfx_PrintStringXY("game:RENDER",0,40);
+            gfx_PrintStringXY("game:RENDER",0,56);
         }
         if (game_flags & SHIFT) {
-            gfx_PrintStringXY("game:SHIFT",0,48);
+            gfx_PrintStringXY("game:SHIFT",0,64);
         }
         if (game_flags & POP) {
-            gfx_PrintStringXY("game:POP",0,56);
+            gfx_PrintStringXY("game:POP",0,72);
         }
         if (game_flags & FALL) {
-            gfx_PrintStringXY("game:FALL",0,64);
+            gfx_PrintStringXY("game:FALL",0,80);
+        }
+        if (game_flags & PUSHDOWN) {
+            gfx_PrintStringXY("game:PUSHDOWN",0,88);
         }
 #endif //DEBUG
         //FPS
-        gfx_PrintStringXY(fps_string,0,232);
+        gfx_PrintStringXY(fps_string,0,LCD_HEIGHT-8);
         if (++fps_counter == 7) {
             ticks = (float)atomic_load_increasing_32(&timer_1_Counter) / 32768;
             last_fps = fps;

@@ -136,7 +136,8 @@ void setAvailableColors(uint8_t * target,uint8_t colors) {
     target[0] = size;
 }
 uint8_t * getAvailableColors(grid_t grid) {
-    //Precondition, there is at least 1 color in grid
+    //Precondition: there is at least 1 bubble in grid
+    //Postcondition: returned array is set if uninitialized and filled with available colors in grid.
     //the returned array is in size + data format
     uint8_t i,j,array_index;
     bool is_in;
@@ -162,7 +163,6 @@ uint8_t * getAvailableColors(grid_t grid) {
             if (!is_in) {
                 found_colors[array_index++] = grid.bubbles[i].color;
                 if (array_index > (MAX_POSSIBLE_COLOR+2)) {
-                    dbg_printf("Invalid!!I!*!@(#U!@I@IUewq array_index %d",array_index);
                     exit(1);
                 }
             }
