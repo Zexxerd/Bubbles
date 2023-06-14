@@ -373,7 +373,6 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
         addtile = true;
     }
     if (addtile) {
-        projectile->visible = false;
         index = gridpos.y * grid.cols + gridpos.x;
         if (!(grid.bubbles[index].flags & EMPTY)) exit(1); //not empty, exit
         grid.bubbles[index].flags &= ~EMPTY;

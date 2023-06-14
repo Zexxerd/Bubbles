@@ -2,7 +2,7 @@
 #Level pack file specification v0.1.0
 
 Level pack header:
-Total size: 40
+Total size: 41
 12 bytes: "BUBBLES!LPCK"
 3 bytes:  Version info (Major,Minor,Patch)
 1 byte:   Number of levels
@@ -21,3 +21,9 @@ Total size: 40
 3 bytes:   Number of bubbles (an int with the upper two bytes empty)
 Bubbles:
 (Number of bubbles * 4) bytes: Level Bubbles
+
+Bubble format:
+1 byte: x pos
+1 byte: y pos
+1 byte: color
+1 byte: flags

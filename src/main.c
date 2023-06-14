@@ -90,8 +90,6 @@ int main(void) {
     point_t debug_point;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
-    //debugTestRead();
-    //return 0;
 #endif //DEBUG
 
     shooter_t shooter;
@@ -105,14 +103,13 @@ int main(void) {
     char lose_string[] = "You Lose!";
     
     max_color = 6;
-    shift_rate = 5;
+    shift_rate = 6;
+    push_down_time = 6;
     turn_counter = 0;
     player_score = 0;
     x = y = 0;
     fps = last_fps = 30;
     fps_string = malloc(15);
-    //debug
-    push_down_time = 6;
     
     //popping animation sprites
     pop_counter = 0;
@@ -186,6 +183,11 @@ int main(void) {
     
     while (!(kb_Data[6] & kb_Clear)) {
         if (lost) break;
+        for (i=0;i<grid.cols;i++) {
+            if (!(grid.bubbles[grid.cols*(grid.rows-1)+i].flags & EMPTY)) {
+                lost = true;
+            }
+        }
         if (game_flags & RENDER) {
             renderGrid(grid,grid_buffer);
             game_flags &= ~RENDER;
@@ -230,7 +232,6 @@ int main(void) {
                     }
                     shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
                     shooter.flags |= ACTIVE_PROJ;
-                    shooter.projectile.visible = true;
                 } else {
                     //none
                 }
@@ -439,16 +440,14 @@ int main(void) {
             fps_ratio = (uint8_t) (fps/last_fps);
             fps_ratio = fps_ratio || 1;
             moveProj(grid,&shooter,fps_ratio << 1);
-            if (shooter.projectile.visible) {
                 gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
-            }
-            if (!(shooter.flags & ACTIVE_PROJ)) {
+            /*if (!(shooter.flags & ACTIVE_PROJ)) {
                 for (i=0;i<grid.cols;i++) {
                     if (!(grid.bubbles[grid.cols*(grid.rows-1)+i].flags & EMPTY)) {
                         lost = true;
                     }
                 }
-            }
+            }*/
         }
         //Display
         renderShooter(shooter);
