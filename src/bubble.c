@@ -24,14 +24,13 @@ unsigned int turn_counter;
 unsigned int push_down_time;
 uint8_t shift_rate;
 uint8_t * available_colors;
-bubble_list_t possible_collisions;
 
-
-bool debug_flag;
+//bool debug_flag;
+point_t debug_pos;
 char string[100];
 
 bool pop_started; //handles initial condition
-int ** pop_locations;
+point_t * pop_locations;
 bubble_list_t pop_cluster;
 uint8_t pop_counter;// timer for pop animation
 
@@ -39,6 +38,8 @@ bool fall_started;
 int ** fall_data;
 int fall_total;
 uint8_t fall_counter;// timer for fall animation
+
+//bool redraw_text;
 
 uint8_t game_flags;
 
@@ -121,6 +122,19 @@ bubble_list_t copyBubbleList(bubble_list_t original) {
         new.bubbles[i] = original.bubbles[i];
     }
     return new;
+}
+
+bubble_list_t * addToBubbleList(bubble_list_t * dest, bubble_list_t * src) {
+    // add to original bubble list
+    uint8_t old_size;
+    old_size = dest->size;
+    dest->size += src->size;
+    dest->bubbles = (bubble_t *) realloc(dest->bubbles,(dest->size) * sizeof(bubble_t));
+    if (dest->bubbles == NULL) exit(1);
+    for (int i = 0;i < src->size;i++) {
+        dest->bubbles[old_size+i] = src->bubbles[i];
+    }
+    return dest;
 }
 
 void setAvailableColors(uint8_t * target,uint8_t colors) {
@@ -244,10 +258,13 @@ void pushDown(grid_t * grid) {
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
     /*Uses the drawing buffer to render the grid to the grid_buffer sprite. This sprite can be drawn later as many times as needed.*/
     /*Precondition: grid.cols is less than 20 (LCD_WIDTH/TILE_WIDTH)
-                    grid.rows is less than 20 (LCD_HEIGHT/ROW_HEIGHT)*/
+                    grid.rows is less than 26 (LCD_HEIGHT/ROW_HEIGHT)
+                    Product of grid.cols and grid.rows is less than 257*/
     int i,j;
     bubble_t tile;
     point_t coord;
+    
+    gfx_SetDrawBuffer();
     gfx_ZeroScreen();
     for (i = 0;i < grid.rows;i++) {
         for (j = 0;j < grid.cols;j++) {
@@ -261,6 +278,30 @@ void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
     grid_buffer->height = grid.rows * ROW_HEIGHT + (TILE_WIDTH>>2); //TILE_HEIGHT + ?
     gfx_GetSprite_NoClip(grid_buffer,0,0);
 }
+float ** generateVectors(int8_t lower,int8_t higher,uint8_t step) {
+    //Generates an array of trigonometric vector coordinates for shooter to use.
+    //
+    static float ** vectors;
+    uint8_t size;
+    int i;
+    uint8_t j;
+    size = (higher - lower) / step + 1; //(64 - -64) / 4 + 1 = 33 pairs
+    if (vectors == NULL) {
+        vectors = (float **) malloc(sizeof(float *) * 2);
+        if (vectors == NULL) {
+            exit(1);
+        }
+        for (j=0;j<2;j++) {
+            vectors[j] = (float *) malloc(sizeof(float) * size + 1);
+        }
+    }
+    for (i = 0;i < size;i++) {
+        vectors[0][i] = sin(rad(lower+(step*i)));
+        vectors[1][i] = cos(rad(lower+(step*i)));
+    }
+    return vectors;
+}
+
 void renderShooter(shooter_t shooter) {
     point_t center;
     center.x = shooter.x + (TILE_WIDTH >> 1);
@@ -268,7 +309,7 @@ void renderShooter(shooter_t shooter) {
     gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]],255-(timer_1_Counter%3));
     gfx_SetColor(shooter.pal_index);
     //gfx_FillCircle(center.x,center.y,TILE_WIDTH>>1);
-    gfx_Line(center.x,center.y,center.x + (1.5 * TILE_WIDTH) * sin(rad(shooter.angle)),center.y - (1.5 * TILE_HEIGHT) * cos(rad(shooter.angle)));
+    gfx_Line(center.x,center.y,center.x + TILE_WIDTH1_5 * shooter.vectors[0][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)],center.y - TILE_HEIGHT1_5 * shooter.vectors[1][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)]);
     //gfx_palette[shooter->pal_index] = bubble_colors[shooter->next_bubbles[0]];
     gfx_TransparentSprite(bubble_sprites[shooter.next_bubbles[0]],shooter.x,shooter.y);
     gfx_SetColor((sizeof_bubble_pal>>1)+shooter.next_bubbles[1]);
@@ -287,8 +328,8 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
     uint8_t i;
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = &shooter->projectile;
-    projectile->x += dt * projectile->speed * sin(rad(projectile->angle));
-    projectile->y -= dt * projectile->speed * cos(rad(projectile->angle));
+    projectile->x += dt * projectile->speed *     shooter->vectors[0][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
+    projectile->y -= dt * projectile->speed *     shooter->vectors[1][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
     proj_coord.x =  projectile->x - grid.x;
     proj_coord.y =  projectile->y - grid.y;
     if (proj_coord.x <= 0) {
@@ -308,8 +349,8 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
     if (proj_coord.x > grid.width || proj_coord.y > grid.height) {
         return;
     }
-    for (i = 0;i < possible_collisions.size;i++) {
-        coord = getTileCoordinate(possible_collisions.bubbles[i].x, possible_collisions.bubbles[i].y);
+    for (i = 0;i < grid.possible_collisions.size;i++) {
+        coord = getTileCoordinate(grid.possible_collisions.bubbles[i].x, grid.possible_collisions.bubbles[i].y);
         if (collide(proj_coord.x + (TILE_WIDTH>>1),
                     proj_coord.y + (TILE_HEIGHT>>1),
                     coord.x + (TILE_WIDTH>>1),
@@ -320,31 +361,13 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
             return;
         }
     }
-    /*for (i = 0;i < grid.rows;i++) {
-        for (j = 0;j < grid.cols;j++) {
-            index = i*grid.cols+j;
-            if (grid.bubbles[index].flags & EMPTY) {
-                continue;
-            }
-            coord = getTileCoordinate(j, i);
-            if (collide(proj_coord.x + (TILE_WIDTH>>1),
-                        proj_coord.y + (TILE_HEIGHT>>1),
-                        coord.x + (TILE_WIDTH>>1),
-                        coord.y + (TILE_HEIGHT>>1),
-                        grid.ball_diameter)) {
-                snapBubble(projectile,grid);
-                shooter->flags &= ~ACTIVE_PROJ;
-                return;
-            }
-        }
-    }*/
 }
 void snapBubble(projectile_t * projectile,grid_t grid) {
     bool addtile;
     uint8_t i,j;
     uint8_t index; //uint8_t or int
     bubble_list_t cluster;
-    point_t gridpos;
+    point_t gridpos,back_coords;
     gridpos = getGridPosition(projectile->x + (TILE_WIDTH>>1) - grid.x,
                               projectile->y + (TILE_HEIGHT>>1) - grid.y);
     addtile = false;
@@ -362,17 +385,31 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
         gridpos.y = grid.rows - 1;
     }
     if (!(grid.bubbles[gridpos.y * grid.cols + gridpos.x].flags & EMPTY)) {
-        for (i = gridpos.y + 1;i < grid.rows;i++) {
-            if ((grid.bubbles[i*grid.cols + gridpos.x].flags) & EMPTY) {
-                gridpos.y = i;
-                addtile = true;
-                break;
+        gfx_SetColor(1);
+        gfx_Rectangle(projectile->x,projectile->y,TILE_WIDTH,TILE_HEIGHT);
+        back_coords = getGridPosition(projectile->x - sin(rad(projectile->angle) * TILE_WIDTH),projectile->y + cos(rad(projectile->angle)) * TILE_HEIGHT);
+        if (grid.bubbles[back_coords.y * grid.cols + back_coords.x].flags & EMPTY) {
+            for (i = gridpos.y + 1;i < grid.rows;i++) {
+                if ((grid.bubbles[i*grid.cols + gridpos.x].flags) & EMPTY) {
+                    gridpos.y = i;
+                    addtile = true;
+                    break;
+                }
             }
+        } else {
+            gridpos = back_coords;
+            addtile = true;
+            debug_flag = true;
         }
     } else {
         addtile = true;
     }
     if (addtile) {
+        debug_pos = getTileCoordinate(gridpos.x,gridpos.y);
+        debug_pos.x += grid.x;
+        debug_pos.y += grid.y;
+        gfx_SetColor(16);
+        gfx_Rectangle(debug_pos.x,debug_pos.y,TILE_WIDTH,TILE_HEIGHT);
         index = gridpos.y * grid.cols + gridpos.x;
         if (!(grid.bubbles[index].flags & EMPTY)) exit(1); //not empty, exit
         grid.bubbles[index].flags &= ~EMPTY;
@@ -382,12 +419,10 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
 
         if (cluster.size >= 3) {
             player_score += 100 * (cluster.size - 2);
+            //redraw_text = true;
             if (game_flags & POP) { //animation already started, free bubbles to let it restart
                 pop_counter = 0;
                 pop_started = false;
-                for(i = 0;i < pop_cluster.size;i++) {
-                    free(pop_locations[i]);
-                }
                 free(pop_locations);
                 free(pop_cluster.bubbles);
             }
@@ -446,6 +481,7 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
             }
         } else {
             turn_counter++;
+            //redraw_text = true;
             if (!(turn_counter % shift_rate)) {
                 if (turn_counter <= push_down_time) {
                     addNewRow(grid,available_colors,9);
@@ -606,6 +642,7 @@ int findFloatingClusters(grid_t grid) { //rename to findFloatingBubbles?
 bubble_list_t getPossibleCollisions(grid_t grid) {
     //Uses neighbors to deduce whether a collision is possible, reducing time spent calculating projectile collisions
     uint8_t i;
+    unsigned int size;
     static bubble_list_t possible_collisions;
     possible_collisions.size = 0;
     if (possible_collisions.bubbles == NULL) {
@@ -614,8 +651,8 @@ bubble_list_t getPossibleCollisions(grid_t grid) {
             exit(1); //failure...
         }
     }
-    
-    for (i = 0;i < grid.rows * grid.cols;i++) {
+    size = grid.rows * grid.cols;
+    for (i = 0;i < size;i++) {
         if (!(grid.bubbles[i].flags & EMPTY)) {
             if (getNeighbors(grid,grid.bubbles[i].x,grid.bubbles[i].y,true).size != getNeighbors(grid,grid.bubbles[i].x,grid.bubbles[i].y,false).size) {
                 possible_collisions.bubbles[possible_collisions.size++] = grid.bubbles[i];

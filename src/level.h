@@ -1,13 +1,13 @@
 #if !defined(LEVEL_H)
 #define LEVEL_H
-#include <ti/screen.h>
+#include <tice.h>
 
 #include <bubble.h>
 #include <fileioc.h>
 #define PACK_SIGNATURE_SIZE 12
 #define PACK_VERSION_SIZE 3
 #define PACK_N_OF_LEVELS_SIZE 1
-#define PACK_NAME_SIZE 24
+#define PACK_NAME_SIZE 25
 #define PACK_HEADER_SIZE ((PACK_SIGNATURE_SIZE + PACK_VERSION_SIZE + PACK_N_OF_LEVELS_SIZE) + PACK_NAME_SIZE)
 
 #define screen_errormsg(s) do {\
@@ -126,13 +126,6 @@ level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
 }
 #endif //LEVEL_H
 
-/*typedef struct pack {
-    char signature[12]; // BUBBLES!LPCK
-    uint8_t version_info[3];
-    uint8_t number_of_levels;
-    char pack_name[25];
-} pack_t;*/
-
 uint8_t savePack(char filename[],pack_t pack,level_t levels[]) {
     //levels array should have (pack.number_of_levels) levels
     uint8_t return_code;
@@ -240,7 +233,7 @@ void debugTestOutput() { //used to compare with level editor export
     for(i = 0;i < levels[1].rows;i++) {
         for (j = 0;j < levels[1].cols;j++) {
             if (i < 9) {
-                levels[1].data.bubbles[(i*levels[1].cols)+j] = newBubble(j,i,(levels[1].max_color-i)%(levels[1].max_color+1),0);
+                levels[1].data.bubbles[(i*levels[1].cols)+j] = newBubble(j,i,levels[1].max_color-(i%(levels[1].max_color+1)),0);
             }
         }
     }
@@ -267,7 +260,7 @@ void debugTestRead() {
     pack_t pack;
     level_t level;
     uint8_t file;
-    file = ti_Open("TESTVAR","r");
+    file = ti_Open("TWOLEVEL","r");
     i = 0;
     l = 0;
     level_changed = true;
