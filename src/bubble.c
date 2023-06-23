@@ -399,7 +399,7 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
         } else {
             gridpos = back_coords;
             addtile = true;
-            debug_flag = true;
+            //debug_flag = true;
         }
     } else {
         addtile = true;
