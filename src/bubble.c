@@ -384,7 +384,25 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
     if (gridpos.y >= grid.rows) {
         gridpos.y = grid.rows - 1;
     }
-    if (!(grid.bubbles[gridpos.y * grid.cols + gridpos.x].flags & EMPTY)) {
+    
+    back_coords = getGridPosition(projectile->x - sin(rad(projectile->angle) * TILE_WIDTH),projectile->y + cos(rad(projectile->angle)) * TILE_HEIGHT);
+    for (i = gridpos.y;i < grid.rows;i++) {
+        if (grid.bubbles[i * grid.cols + gridpos.x].flags & EMPTY) {
+            gridpos.y = i;
+            addtile = true;
+            break;
+        } else {
+            back_coords.y++;
+            if (back_coords.y >= grid.rows) break;
+            if (grid.bubbles[back_coords.y * grid.cols + back_coords.x].flags & EMPTY) {
+                gridpos = back_coords;
+                addtile = true;
+                break;
+            }
+        }
+    }
+    
+    /*if (!(grid.bubbles[gridpos.y * grid.cols + gridpos.x].flags & EMPTY)) {
         gfx_SetColor(1);
         gfx_Rectangle(projectile->x,projectile->y,TILE_WIDTH,TILE_HEIGHT);
         back_coords = getGridPosition(projectile->x - sin(rad(projectile->angle) * TILE_WIDTH),projectile->y + cos(rad(projectile->angle)) * TILE_HEIGHT);
@@ -403,7 +421,7 @@ void snapBubble(projectile_t * projectile,grid_t grid) {
         }
     } else {
         addtile = true;
-    }
+    }*/
     if (addtile) {
         debug_pos = getTileCoordinate(gridpos.x,gridpos.y);
         debug_pos.x += grid.x;

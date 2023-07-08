@@ -26,7 +26,6 @@
 
 /**
  TODO: Add animation bubble list instead of pop sprite/fall sprite int arrays
- TODO: Use trig to snap bubble onto grid instead of subtracting row position of projectile
  Mark this mode as survival;
  */
 #ifndef TILE_WIDTH
@@ -84,7 +83,7 @@ int main(void) {
     
     uint8_t highlight_timer;
     uint8_t fps_counter;
-    uint8_t fps_ratio;
+    float fps_ratio;
     float fps, last_fps, ticks;
     char * fps_string;
 
@@ -483,9 +482,9 @@ int main(void) {
 #endif //DEBUG
         //Move the projectile
         if (shooter.flags & ACTIVE_PROJ) {
-            fps_ratio = (uint8_t) (fps/last_fps);
+            fps_ratio = fps/last_fps;
             //gfx_Sprite(behind_proj_sprite,shooter.projectile.x,shooter.projectile.y);
-            moveProj(grid,&shooter,fps_ratio ? fps_ratio << 1 : 1);
+            moveProj(grid,&shooter,fps_ratio * 2);
             if (shooter.flags & ACTIVE_PROJ) {
                 //gfx_GetSprite(behind_proj_sprite,shooter.projectile.x,shooter.projectile.y);
                 gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
