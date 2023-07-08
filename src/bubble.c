@@ -308,7 +308,6 @@ void renderShooter(shooter_t shooter) {
     center.y = shooter.y + (TILE_HEIGHT >> 1);
     gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]],255-(timer_1_Counter%3));
     gfx_SetColor(shooter.pal_index);
-    //gfx_FillCircle(center.x,center.y,TILE_WIDTH>>1);
     gfx_Line(center.x,center.y,center.x + TILE_WIDTH1_5 * shooter.vectors[0][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)],center.y - TILE_HEIGHT1_5 * shooter.vectors[1][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)]);
     //gfx_palette[shooter->pal_index] = bubble_colors[shooter->next_bubbles[0]];
     gfx_TransparentSprite(bubble_sprites[shooter.next_bubbles[0]],shooter.x,shooter.y);
@@ -328,8 +327,9 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
     uint8_t i;
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = &shooter->projectile;
-    projectile->x += dt * projectile->speed *     shooter->vectors[0][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
-    projectile->y -= dt * projectile->speed *     shooter->vectors[1][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
+    projectile->x += dt * projectile->speed * shooter.vectors[0][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)];
+    projectile->y -= dt * projectile->speed * shooter.vectors[1][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)];
+
     proj_coord.x =  projectile->x - grid.x;
     proj_coord.y =  projectile->y - grid.y;
     if (proj_coord.x <= 0) {

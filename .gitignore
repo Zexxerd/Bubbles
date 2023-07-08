@@ -4,4 +4,5 @@ src/gfx/*.c
 src/gfx/*.h
 src/gfx/*.lst
 charsheet.txt
+debug.txt
 .DS_Store
