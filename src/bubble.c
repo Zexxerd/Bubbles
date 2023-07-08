@@ -327,8 +327,8 @@ void moveProj(grid_t grid,shooter_t * shooter,float dt) {
     uint8_t i;
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = &shooter->projectile;
-    projectile->x += dt * projectile->speed * shooter.vectors[0][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)];
-    projectile->y -= dt * projectile->speed * shooter.vectors[1][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)];
+    projectile->x += dt * projectile->speed * shooter->vectors[0][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
+    projectile->y -= dt * projectile->speed * shooter->vectors[1][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
 
     proj_coord.x =  projectile->x - grid.x;
     proj_coord.y =  projectile->y - grid.y;
