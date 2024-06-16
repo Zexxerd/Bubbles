@@ -3,10 +3,11 @@ palettes:
     fixed-entries:
       - color: {index: 0, r: 0, g: 0, b: 0}
     images: automatic
-
+  - name: bubbles_logo_pal
+    images: automatic
+    max-entries: 32
 converts:
   - name: bubbles
-    
     palette: bubble_pal
     transparent-color-index: 0
     images:
@@ -24,13 +25,20 @@ converts:
       - bubble_purple_pop.png
       - bubble_violet.png
       - bubble_violet_pop.png
+  - name: bubbles_logo
+    palette: bubbles_logo_pal
+    transparent-color-index: 0
+    palette-offset: 49
+    images:
+      - bubbles_logo.png
 
 outputs:
   - type: c
     include-file: bubble.h
     prepend-palette-sizes: true
-    
     palettes:
       - bubble_pal
+      - bubbles_logo_pal
     converts:
       - bubbles
+      - bubbles_logo

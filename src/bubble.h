@@ -10,16 +10,20 @@
 #include "gfx/bubble.h"
 
 //Constants
+#define WHITE 0xFFFF
+#define BLACK 0x0000
+
+
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16
-#define TILE_WIDTH1_5 (TILE_WIDTH/2*3)
-#define TILE_HEIGHT1_5 (TILE_HEIGHT/2*3)
+#define TILE_WIDTH1_5 ((TILE_WIDTH >> 1) * 3)
+#define TILE_HEIGHT1_5 ((TILE_HEIGHT >> 1) * 3)
 
 #define LBOUND -64
 #define RBOUND 64
 #define SHOOTER_STEP 4
 
-#define getRangeIndex(angle,lower,step) ((angle-lower)/step)
+#define getRangeIndex(angle,lower,step) ((angle - lower) / step)
 
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
 #define MAX_POSSIBLE_COLOR 6 // highest possible index of max_color
@@ -49,12 +53,14 @@
 #define REDRAW_SHOOTER (1<<2)
 
 //grid
-#define RENDER   (1<<0) // redraw grid
-#define SHIFT    (1<<1) // the grid goes down one
-#define NEW_ROW  (1<<1) // ^^
-#define POP      (1<<2) // Bubbles are popping.
-#define FALL     (1<<3) // Falling bubbles, wear a helmet
-#define PUSHDOWN (1<<4) // Level has run out of bubbles, go down
+#define RENDER    (1<<0) // redraw grid
+#define SHIFT     (1<<1) // the grid goes down one
+#define NEW_ROW   (1<<1) // ^^
+#define POP       (1<<2) // Bubbles are popping.
+#define FALL      (1<<3) // Falling bubbles, wear a helmet
+#define PUSHDOWN  (1<<4) // Level has run out of bubbles, or push interval has passed, go down
+#define NEW_LEVEL (1<<5) // New level
+#define CHECK     (1<<6) // Check if bubbles have overflowed
 
 /*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) do { \
@@ -65,6 +71,7 @@ gfx_PrintUInt(i,length);                     \
 gfx_SetTextXY(x,y);                         \
 gfx_PrintInt(i,length);                      \
 } while (0)
+
 //basic debug message
 #define debug_message(message)  \
 gfx_FillScreen(255);             \
@@ -95,10 +102,21 @@ typedef struct bubble {
     uint8_t color;
     uint8_t flags; // NULL,NULL,NULL,falling?,popping?,empty?,removed?,processed?
 } bubble_t; //this should be used in grid_t
+typedef struct falling_bubble {
+    unsigned int x;
+    unsigned int y;
+    uint8_t color;
+    int8_t velocity; //flags i guess
+} falling_bubble_t;
 typedef struct bubble_list {
     int size;
     bubble_t * bubbles;
 } bubble_list_t;
+typedef struct falling_bubble_list {
+    int size;
+    falling_bubble_t * bubbles;
+} falling_bubble_list_t;
+
 typedef struct grid {
     int x, y;  // left of level, top of level
     //uint8_t flags;
@@ -118,9 +136,9 @@ typedef struct point {
 typedef struct projectile {
     float x, y;
     uint8_t speed;
+    int angle;
     uint8_t color;
     bool visible;
-    int angle;
 } projectile_t;
 
 typedef struct shooter {
@@ -151,7 +169,7 @@ float ** generateVectors(int8_t lower,int8_t higher,uint8_t step);
 void renderShooter(shooter_t shooter);
 bool collide(float x1,float y1,float x2,float y2,uint8_t r);
 void moveProj(grid_t grid,shooter_t * shooter,float dt);
-void snapBubble(projectile_t * projectile,grid_t grid);
+void snapBubble(shooter_t * shooter,grid_t grid, float dt);
 void resetProcessed(grid_t grid);
 bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool add_empty);
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);

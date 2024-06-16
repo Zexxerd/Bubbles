@@ -1,4 +1,4 @@
-#ifndef PIXELATE_H
+#if !defined(PIXELATE_H)
 #define PIXELATE_H
 
 #include <graphx.h>

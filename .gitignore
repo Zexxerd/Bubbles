@@ -1,8 +1,11 @@
+.DS_Store
+charsheet.txt
+debug.txt
 bin/
 obj/
 src/gfx/*.c
 src/gfx/*.h
 src/gfx/*.lst
-charsheet.txt
-debug.txt
-.DS_Store
+src/gfx/bubbles_logo_1024.png
+src/partial_redraw.txt
+src/levelformat.txt

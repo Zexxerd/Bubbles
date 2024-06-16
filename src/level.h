@@ -15,7 +15,7 @@ os_SetCursorPos(0,0);\
 os_PutStrFull(s);\
 while(!os_GetCSC());\
 } while (0)
-
+\
 typedef struct pack {
     char signature[12]; // BUBBLES!LPCK
     uint8_t version_info[3];
@@ -40,36 +40,36 @@ pack_t loadPackData(uint8_t file_handle) {
     //Precondition: file_handle is open for reading.
     pack_t pack;
     unsigned int return_code;
-    return_code = ti_Read(&pack,PACK_HEADER_SIZE,1,file_handle);
+    return_code = ti_Read(&pack, PACK_HEADER_SIZE, 1, file_handle);
     if (return_code != 1) {
-        strcpy(pack.pack_name,"ERROR!BUBBLE PACK READ\0\0");
+        strcpy(pack.pack_name, "ERROR!BUBBLE PACK READ\0\0");
     }
     pack.pack_name[24] = '\0';
     return pack;
 }
-int loadLevel(grid_t grid,shooter_t * shooter,level_t level) {
+int loadLevel(grid_t grid, shooter_t * shooter, level_t level) {
     int i;
     if (grid.rows * grid.cols != level.rows * level.cols) {
-        grid.bubbles = realloc(grid.bubbles,sizeof(bubble_t) * (level.rows * level.cols));
+        grid.bubbles = realloc(grid.bubbles, sizeof(bubble_t) * (level.rows * level.cols));
         if (grid.bubbles == NULL) exit(1);
     }
-    for (i = 0;i < level.data.size;i++) {
+    for (i = 0; i < level.data.size; i++) {
         grid.bubbles[i] = level.data.bubbles[i];
     }
-    for (i = level.data.size;i < level.cols*level.rows;i++) {
-        grid.bubbles[i] = newBubble(i%level.cols,i/level.cols,0,EMPTY);
+    for (i = level.data.size; i < level.cols * level.rows; i++) {
+        grid.bubbles[i] = newBubble(i % level.cols, i / level.cols, 0, EMPTY);
     }
-    memcpy(shooter->next_bubbles,level.starting_bubbles,sizeof(level.starting_bubbles));
+    memcpy(shooter->next_bubbles, level.starting_bubbles, sizeof(level.starting_bubbles));
     return i;
 }
 
-level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
+level_t loadLevelFromFile(uint8_t file_handle, uint8_t offset) {
     //Precondition: file_handle is open for reading.
     level_t level;
     int location;
     int return_code;
     int i;
-    
+
     level.max_color = 0;
     level.shift_rate = 0;
     level.push_down_time = 0;
@@ -83,7 +83,7 @@ level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
     if (return_code == EOF) {
         strncpy(level.name,"ERROR!BUBBLE START",25);
         return level;
-    } //return "\0BUBSTAERROR\0"; //Fail to start search
+    } //Fail to start search
     while (location < offset) {
         return_code = ti_Read(&level,sizeof(level_t)-sizeof(bubble_t *),1,file_handle); //get data.size
         if (return_code != 1) {
@@ -99,56 +99,55 @@ level_t loadLevelFromFile(uint8_t file_handle,uint8_t offset) {
         }
         location++;
     }
-    return_code = ti_Read(&level,sizeof(level_t)-sizeof(void *),1,file_handle);
+    return_code = ti_Read(&level, sizeof(level_t) - sizeof(void *), 1, file_handle);
     if (return_code != 1) {
         level.max_color = 0;
-        strncpy(level.name,"ERROR!BUBBLE FOUND LEVEL",25);
+        strncpy(level.name, "ERROR!BUBBLE FOUND LEVEL", 25);
         return level;
     }
-    
+
     level.data.bubbles = (bubble_t *) malloc(level.cols*level.rows * sizeof(bubble_t));
     if (level.data.bubbles == NULL) {
         exit(1);
     }
-    
-    return_code = ti_Read(level.data.bubbles,sizeof(bubble_t),level.data.size,file_handle);
+
+    return_code = ti_Read(level.data.bubbles, sizeof(bubble_t), level.data.size, file_handle);
     if (return_code != level.data.size) {
         level.max_color = 0;
         strncpy(level.name,"ERROR!BUBBLE DATA",25);
         return level;
     }
-    
-    for (i = level.data.size;i < level.cols * level.rows;i++) {
+
+    for (i = level.data.size; i < level.cols * level.rows; i++) {
         level.data.bubbles[i] = newBubble(i%level.cols,i/level.cols,0,EMPTY);
     }
-    
+
     return level;
 }
-#endif //LEVEL_H
 
-uint8_t savePack(char filename[],pack_t pack,level_t levels[]) {
+uint8_t savePack(char filename[], pack_t pack, level_t levels[]) {
     //levels array should have (pack.number_of_levels) levels
     uint8_t return_code;
     uint8_t file_handle;
     int i;
-    file_handle = ti_Open(filename,"w");
+    file_handle = ti_Open(filename, "w");
     //pack
-    return_code = ti_Write(&pack,sizeof(pack_t),1,file_handle);
+    return_code = ti_Write(&pack, sizeof(pack_t), 1, file_handle);
     if (return_code != 1) {
         return 1;
     }
-    for (i = 0;i < pack.number_of_levels;i++) {
-        return_code = ti_Write(&levels[i],sizeof(level_t)-sizeof(bubble_t *),1,file_handle);
+    for (i = 0; i < pack.number_of_levels; i++) {
+        return_code = ti_Write(&levels[i], sizeof(level_t) - sizeof(bubble_t *), 1, file_handle);
         if (return_code != 1) {
-            dbg_printf("Level number: %d\n",i);
-            dbg_printf("Level count: %d\n",pack.number_of_levels);
-            dbg_printf("Write size: %d\n",sizeof(level_t)-sizeof(bubble_t *));
-            dbg_printf("return code: %d\n",return_code);
-            dbg_printf("Loc of failure (&levels[i]): %p",&levels[i]);
+            dbg_printf("Level number: %d\n", i);
+            dbg_printf("Level count: %d\n", pack.number_of_levels);
+            dbg_printf("Write size: %d\n", sizeof(level_t) - sizeof(bubble_t *));
+            dbg_printf("return code: %d\n", return_code);
+            dbg_printf("Loc of failure (&levels[i]): %p", &levels[i]);
             screen_errormsg("Error during level header write");
             return 1;
         }
-        return_code = ti_Write(levels[i].data.bubbles,sizeof(bubble_t),levels[i].data.size,file_handle);
+        return_code = ti_Write(levels[i].data.bubbles, sizeof(bubble_t), levels[i].data.size, file_handle);
         if (return_code != levels[i].data.size) {
             screen_errormsg("Error during level bubbles write");
             return 1;
@@ -158,22 +157,22 @@ uint8_t savePack(char filename[],pack_t pack,level_t levels[]) {
     return 0; //success!
 }
 
-uint8_t saveLevel(char filename[],level_t level,char pack_name[]) {
+uint8_t saveLevel(char filename[], level_t level, char pack_name[]) {
     //Returns 0 on success, 1 otherwise
     int return_code;
     uint8_t file_handle;
-    file_handle = ti_Open(filename,"w");
+    file_handle = ti_Open(filename, "w");
     //pack info
-    return_code = ti_Write("BUBBLES!LPCK\x00\x01\x00\x01",16,1,file_handle); //for now it saves 1 level
+    return_code = ti_Write("BUBBLES!LPCK\x00\x01\x00\x01", 16, 1, file_handle); //for now it saves 1 level
     if (return_code != 1)
         return 1;
-    return_code = ti_Write(pack_name,24,1,file_handle);
+    return_code = ti_Write(pack_name, 24, 1, file_handle);
     if (return_code != 1)
         return 1;
-    return_code = ti_Write(&level,sizeof(level_t)-sizeof(bubble_t *),1,file_handle);
+    return_code = ti_Write(&level, sizeof(level_t) - sizeof(bubble_t *), 1, file_handle);
     if (return_code != 1)
         return 1;
-    return_code = ti_Write(level.data.bubbles,sizeof(bubble_t),level.data.size,file_handle);
+    return_code = ti_Write(level.data.bubbles, sizeof(bubble_t), level.data.size, file_handle);
     if (return_code != level.data.size)
         return 1;
     
@@ -186,15 +185,15 @@ void debugTestOutput() { //used to compare with level editor export
     level_t *levels;
     
     levels = (level_t *) malloc(2 * sizeof(level_t));
-    strcpy(pack.signature,"BUBBLES!LPCK");
+    strncpy(pack.signature,"BUBBLES!LPCK",PACK_SIGNATURE_SIZE);
     pack.version_info[0] = 0;
     pack.version_info[1] = 1;
     pack.version_info[2] = 0;
     pack.number_of_levels = 2;
-    strcpy(pack.pack_name,"My First Level Pack!\0\0\0\0\0");
+    strcpy(pack.pack_name, "My First Level Pack!\0\0\0\0\0");
     
     //strcpy(levels[0].name,"Test level name.Test.ing\0");
-    strncpy(levels[0].name,"First!First!First!First!",25);
+    strncpy(levels[0].name, "First!First!First!First!", 25);
     levels[0].max_color = 6;
     levels[0].shift_rate = 5;
     levels[0].push_down_time = 25;
@@ -208,10 +207,10 @@ void debugTestOutput() { //used to compare with level editor export
     levels[0].data.size = 80;
     levels[0].data.bubbles = (bubble_t *) malloc(levels[0].data.size * sizeof(bubble_t));
     if (!levels[0].data.bubbles) exit(1);
-    for(i = 0;i < levels[0].rows;i++) {
-        for (j = 0;j < levels[0].cols;j++) {
+    for(i = 0; i < levels[0].rows; i++) {
+        for (j = 0; j < levels[0].cols; j++) {
             if (i < 8) {
-                levels[0].data.bubbles[(i*levels[0].cols)+j] = newBubble(j,i,i%(levels[0].max_color+1),0);
+                levels[0].data.bubbles[(i * levels[0].cols) + j] = newBubble(j, i, i % (levels[0].max_color + 1), 0);
             }
         }
     }
@@ -376,3 +375,4 @@ void debugTestRead() {
         }
     }
 }
+#endif
