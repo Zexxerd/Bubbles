@@ -6,7 +6,8 @@ First, go here (https://ce-programming.github.io/toolchain/static/getting-starte
 
 Next, use your terminal to clone this repository to your computer. After that, enter its directory, type `make gfx`, and then type `make` or `make debug`. The whole process will look something like this:
 ```
-#Install CEdev to home directory
+#Install CEdev to home directory first
+#then:
 cd desired_directory
 git clone "https://github.com/Zexxerd/Bubbles.git"
 cd bubbles
@@ -34,4 +35,4 @@ Math and Apps change the color of the shooter.
 
 Prgm shows the available colors in the grid.
 
-Vars shows the bubbles that a projectile should be able to collide with. 
+Vars shows the bubbles that a projectile should be able to collide with.
