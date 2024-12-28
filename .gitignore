@@ -7,5 +7,6 @@ src/gfx/*.c
 src/gfx/*.h
 src/gfx/*.lst
 src/gfx/bubbles_logo_1024.png
+src/gfx/colorsheet.txt
 src/partial_redraw.txt
 src/levelformat.txt

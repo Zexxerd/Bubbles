@@ -90,6 +90,7 @@ void game(void) {
     uint8_t highlight_timer;
     int debug_fall_total;
     point_t debug_point;
+    bubble_t debug_bubble;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
     //debugTestOutput();
@@ -325,19 +326,31 @@ void game(void) {
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
             while (kb_Data[2] & kb_Alpha) kb_Scan();
-            neighbors = getNeighbors(grid,grid.bubbles[(y * grid.cols) + x].x,grid.bubbles[(y * grid.cols) + x].y,false);
+            debug_bubble = grid.bubbles[(y * grid.cols) + x];
+            neighbors = getNeighbors(grid,debug_bubble.x,debug_bubble.y,false);
             gfx_SetColor(255);
-            gfx_FillRectangle(0, 16, 100, neighbors.size << 3);
-            gfx_PrintStringXY("Neighbors:",0,16);
-            for (i = 0;i < neighbors.size;i++) {
-                debug_point.x = gfx_GetStringWidth("Neighbors:");
-                debug_point.y = 16+(i<<3);
-                gfx_PrintStringXY("(",debug_point.x,debug_point.y);
-                gfx_PrintUIntXY(neighbors.bubbles[i].x,2,debug_point.x+8,debug_point.y);
-                gfx_PrintStringXY(",",debug_point.x+24,debug_point.y);
-                gfx_PrintUIntXY(neighbors.bubbles[i].y,2,debug_point.x+40,debug_point.y);
-                gfx_PrintStringXY(")",debug_point.x+56,debug_point.y);
-                gfx_PrintUIntXY(neighbors.bubbles[i].color,2,debug_point.x+64,debug_point.y);
+            debug_point.x = gfx_GetStringWidth("Current:");
+            debug_point.y = 0;
+            gfx_FillRectangle(0, 0, 100, (debug_point.y + neighbors.size) << 3);
+            gfx_PrintStringXY("Current:", 0, 0);
+            gfx_PrintStringXY("(", debug_point.x, 0);
+            gfx_PrintUIntXY(debug_bubble.x, 2, debug_point.x + 8, 0);
+            gfx_PrintStringXY(",", debug_point.x + 24, debug_point.y);
+            gfx_PrintUIntXY(debug_bubble.y, 2, debug_point.x + 40, 0);
+            gfx_PrintStringXY(")", debug_point.x + 56, debug_point.y);
+            gfx_PrintUIntXY(debug_bubble.color, 2, debug_point.x + 64, 0);
+
+            debug_point.x = gfx_GetStringWidth("Neighbors:");
+            debug_point.y = 32;
+            gfx_PrintStringXY("Neighbors:",0,debug_point.y);
+            for (i = 0; i < neighbors.size; i++) {
+                j = debug_point.y + (i << 3);
+                gfx_PrintStringXY("(",debug_point.x,j);
+                gfx_PrintUIntXY(neighbors.bubbles[i].x, 2,debug_point.x + 8, j);
+                gfx_PrintStringXY(",", debug_point.x + 24, debug_point.y);
+                gfx_PrintUIntXY(neighbors.bubbles[i].y, 2, debug_point.x + 40, j);
+                gfx_PrintStringXY(")", debug_point.x + 56, debug_point.y);
+                gfx_PrintUIntXY(neighbors.bubbles[i].color, 2, debug_point.x + 64, j);
             }
             gfx_BlitBuffer();
             while(!os_GetCSC());
@@ -550,9 +563,9 @@ void game(void) {
                 shooter.projectile.visible = false;
             }
             if (pop_started) {
-                for (i = 0;i < pop_cluster.size;i++) { //animate
+                for (i = 0; i < pop_cluster.size; i++) { //animate
                     if (pop_counter & 1) {
-                        drawTile(pop_cluster.bubbles[i].color,pop_locations[i].x,pop_locations[i].y);
+                        drawTile(pop_cluster.bubbles[i].color, pop_locations[i].x, pop_locations[i].y);
                     }
                     else {
                         //gfx_SetColor(255);
@@ -571,7 +584,10 @@ void game(void) {
             }
             if (game_flags & FALL) {
                 for (i = 0; i < fall_total; i++) {
-                    drawTile(fall_data.bubbles[i].color, fall_data.bubbles[i].x, fall_data.bubbles[i].y);
+                    j = fall_data.bubbles[i].y;
+                    if (j < LCD_HEIGHT) {
+                        drawTile(fall_data.bubbles[i].color, fall_data.bubbles[i].x, fall_data.bubbles[i].y);
+                    }
                 }
             }
             /*if (current_game == SURVIVAL) {
@@ -648,7 +664,6 @@ void game(void) {
         if (lost || won) break;
         if (kb_Data[6] & kb_Clear) {
             quit = true;
-            while (os_GetCSC());
         }
     }
     if (lost) {

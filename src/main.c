@@ -49,6 +49,7 @@ int main(void) {
     //point_t point;
     uint16_t saved_palette[256];
     bool selected = true;
+    bool booted = false;
     quit = false;
     
     gfx_palette[255] = 0xFFFF;
@@ -65,8 +66,11 @@ int main(void) {
             gfx_FillScreen(255);
             gfx_SetTransparentColor(0x31);
             gfx_TransparentSprite(bubbles_logo, logo_left, logo_top);
-            memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
-            memset(gfx_palette, 0, sizeof(uint16_t) * 256);
+            if (!booted) {
+                memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
+                memset(gfx_palette, 0, sizeof(uint16_t) * 256);
+                booted = true;
+            }
             gfx_BlitBuffer();
         }
         gfx_SetTransparentColor(0);
@@ -79,11 +83,10 @@ int main(void) {
                 quit = true;
                 selected = true;
             }
-            if (dark == 255) {
+            if (dark == 255 / 5 * 5) {
                 memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                 dark = 256;
-            }
-            if (dark < 255) {
+            } else if (dark < 255) {
                 for (int i = 0; i < 256; i++) {
                     gfx_palette[i] = gfx_Darken(saved_palette[i], dark);
                 }

@@ -359,13 +359,11 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
     uint8_t i,j;
     uint8_t index; //uint8_t or int
     bubble_list_t cluster;
-    point_t gridpos, back_coords;
+    point_t gridpos, back_coords, debug_coords;
 
     gridpos = getGridPosition(shooter->projectile.x + (TILE_WIDTH>>1) - grid.x,
                               shooter->projectile.y + (TILE_HEIGHT>>1) - grid.y);
     addtile = false;
-    /**DEBUG**/
-
     //if gridpos is outside of the grid, force it in.
     if (gridpos.x < 0) {
         gridpos.x = 0;
@@ -379,26 +377,53 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
     if (gridpos.y >= grid.rows) {
         gridpos.y = grid.rows - 1;
     }
-    
-    back_coords = getGridPosition(shooter->projectile.x - shooter->projectile.speed * shooter->vectors[0][getRangeIndex(shooter->projectile.angle, LBOUND, SHOOTER_STEP)]
-                                  * dt,
-                                  shooter->projectile.y + shooter->projectile.speed * shooter->vectors[1][getRangeIndex(shooter->projectile.angle, LBOUND, SHOOTER_STEP)] * dt);
+    index = getRangeIndex(shooter->projectile.angle, LBOUND, SHOOTER_STEP);
+#ifdef DEBUG
+    back_coords = getGridPosition(round(shooter->projectile.x - shooter->projectile.speed * shooter->vectors[0][index] * dt),
+                                  round(shooter->projectile.y + shooter->projectile.speed * shooter->vectors[1][index] * dt));
     for (i = gridpos.y; i < grid.rows; i++) {
+        gfx_SetColor(1);
+        debug_coords = getTileCoordinate(gridpos.x, i);
+        debug_coords.x += grid.x;
+        debug_coords.y += grid.y;
+        gfx_PrintStringXY("First color:", 0, 0);
+        gfx_PrintStringXY("Second color:", 0, 16);
+        gfx_PrintUIntXY(gfx_palette[1], 8, 104, 0);
+        gfx_PrintUIntXY(gfx_palette[29], 8, 104, 16);
+        gfx_PrintStringXY("Collision location:", 0, 32);
+        gfx_PrintUIntXY(debug_coords.x, 5, 144, 32);
+        gfx_PrintUIntXY(debug_coords.y, 5, 216, 32);
+
+        gfx_FillRectangle(debug_coords.x, debug_coords.y, TILE_WIDTH, TILE_HEIGHT);
+#endif
         if (grid.bubbles[i * grid.cols + gridpos.x].flags & EMPTY) {
             gridpos.y = i;
             addtile = true;
             break;
         } else {
-            back_coords.y++;
             if (back_coords.y >= grid.rows) break;
+            gfx_SetColor(29);
+            debug_coords = getTileCoordinate(back_coords.y, back_coords.x);
+            gfx_FillRectangle(debug_coords.x, debug_coords.y, TILE_WIDTH, TILE_HEIGHT);
             if (grid.bubbles[back_coords.y * grid.cols + back_coords.x].flags & EMPTY) {
                 gridpos = back_coords;
                 addtile = true;
+#ifdef DEBUG
+                gfx_PrintStringXY("Final location:", 0, 48);
+                gfx_PrintUIntXY(debug_coords.x, 5, 144, 48);
+                gfx_PrintUIntXY(debug_coords.y, 5, 216, 48);
+#endif
                 break;
             }
+#ifdef DEBUG
+            gfx_FillRectangle(shooter->projectile.x + (TILE_WIDTH>>1), shooter->projectile.y + (TILE_HEIGHT>>1), TILE_WIDTH, TILE_HEIGHT);
+#endif
+            back_coords.y++;
         }
     }
     
+    gfx_BlitBuffer();
+    while(!os_GetCSC());
     /*if (!(grid.bubbles[gridpos.y * grid.cols + gridpos.x].flags & EMPTY)) {
         gfx_SetColor(1);
         gfx_Rectangle(projectile->x,projectile->y,TILE_WIDTH,TILE_HEIGHT);
@@ -420,21 +445,12 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
         addtile = true;
     }*/
     if (addtile) {
-        /*gfx_SetColor(1);
-        gfx_FillRectangle(shooter->projectile.x, shooter->projectile.y, TILE_WIDTH, TILE_HEIGHT);
-        point_t debug_pos = getTileCoordinate(gridpos.x,gridpos.y);
-        debug_pos.x += grid.x;
-        debug_pos.y += grid.y;
-        gfx_SetColor(16);
-        gfx_FillRectangle(debug_pos.x,debug_pos.y,TILE_WIDTH,TILE_HEIGHT);
-        gfx_BlitBuffer();
-        while(!os_GetCSC());*/
         index = gridpos.y * grid.cols + gridpos.x;
         if (!(grid.bubbles[index].flags & EMPTY)) exit(1); //not empty, exit
         grid.bubbles[index].flags &= ~EMPTY;
         grid.bubbles[index].color = shooter->projectile.color;
         game_flags |= RENDER;
-        cluster = findCluster(grid,gridpos.x, gridpos.y, true, true, false);
+        cluster = findCluster(grid, gridpos.x, gridpos.y, true, true, false);
 
         if (cluster.size >= 3) {
             player_score += 100 * (cluster.size - 2);
@@ -446,7 +462,7 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
             }
             game_flags |= POP; //pop animation starts
             pop_cluster = copyBubbleList(cluster);
-            for (i = 0;i < cluster.size;i++) {
+            for (i = 0; i < cluster.size; i++) {
                 grid.bubbles[cluster.bubbles[i].y * grid.cols + cluster.bubbles[i].x].flags |= EMPTY;
             }
             if (game_flags & FALL) {
@@ -559,7 +575,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
     toprocess.bubbles[0].flags |= PROCESSED;
     while (toprocess.size) {
         // Pop the last element from the array
-        currenttile = toprocess.bubbles[toprocess.size-1];
+        currenttile = toprocess.bubbles[toprocess.size - 1];
         toprocess.size--;
 //        toprocess.bubbles = realloc(toprocess.bubbles,(--toprocess.size) * sizeof(bubble_t));
         // Skip processed and empty tiles

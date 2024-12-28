@@ -23,7 +23,8 @@
 #define RBOUND 64
 #define SHOOTER_STEP 4
 
-#define getRangeIndex(angle,lower,step) ((angle - lower) / step)
+#define matrixIndex(x, y, columns) ((y * columns) + x)
+#define getRangeIndex(angle, lower, step) ((angle - lower) / step)
 
 #define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
 #define MAX_POSSIBLE_COLOR 6 // highest possible index of max_color
