@@ -378,11 +378,11 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
         gridpos.y = grid.rows - 1;
     }
     index = getRangeIndex(shooter->projectile.angle, LBOUND, SHOOTER_STEP);
-#ifdef DEBUG
     back_coords = getGridPosition(round(shooter->projectile.x - shooter->projectile.speed * shooter->vectors[0][index] * dt),
                                   round(shooter->projectile.y + shooter->projectile.speed * shooter->vectors[1][index] * dt));
     for (i = gridpos.y; i < grid.rows; i++) {
         gfx_SetColor(1);
+#ifdef DEBUG
         debug_coords = getTileCoordinate(gridpos.x, i);
         debug_coords.x += grid.x;
         debug_coords.y += grid.y;
@@ -393,7 +393,6 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
         gfx_PrintStringXY("Collision location:", 0, 32);
         gfx_PrintUIntXY(debug_coords.x, 5, 144, 32);
         gfx_PrintUIntXY(debug_coords.y, 5, 216, 32);
-
         gfx_FillRectangle(debug_coords.x, debug_coords.y, TILE_WIDTH, TILE_HEIGHT);
 #endif
         if (grid.bubbles[i * grid.cols + gridpos.x].flags & EMPTY) {
@@ -403,8 +402,10 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
         } else {
             if (back_coords.y >= grid.rows) break;
             gfx_SetColor(29);
+#ifdef DEBUG
             debug_coords = getTileCoordinate(back_coords.y, back_coords.x);
             gfx_FillRectangle(debug_coords.x, debug_coords.y, TILE_WIDTH, TILE_HEIGHT);
+#endif
             if (grid.bubbles[back_coords.y * grid.cols + back_coords.x].flags & EMPTY) {
                 gridpos = back_coords;
                 addtile = true;
