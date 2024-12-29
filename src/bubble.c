@@ -422,9 +422,10 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
             back_coords.y++;
         }
     }
-    
+#ifdef DEBUG
     gfx_BlitBuffer();
     while(!os_GetCSC());
+#endif
     /*if (!(grid.bubbles[gridpos.y * grid.cols + gridpos.x].flags & EMPTY)) {
         gfx_SetColor(1);
         gfx_Rectangle(projectile->x,projectile->y,TILE_WIDTH,TILE_HEIGHT);
