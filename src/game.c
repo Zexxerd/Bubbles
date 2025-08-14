@@ -9,10 +9,11 @@
 #include <keypadc.h>
 #include <debug.h>
 
-#include "gfx/bubble.h"
+#include "key.h"
 #include "pixelate.h"
 #include "bubble.h"
 #include "game.h"
+#include "gfx/bubble.h"
 
 //matrix(x,y) = matrix((y * matrix_cols) + x)
 /**
@@ -68,7 +69,7 @@ extern uint8_t fall_counter;
 
 extern bool quit;
 extern char lose_string[];
-extern char game_mode_strings[4][18];
+extern char option_strings[4][18];
 
 void game(void) {
     int i,j,k; //universal counter
@@ -112,6 +113,10 @@ void game(void) {
     gfx_sprite_t * grid_buffer;
     gfx_sprite_t * behind_proj_sprite;
     
+    //key presses
+    bool kb_2nd_press, kb_2nd_prev;
+    bool kb_clear_press, kb_clear_prev;
+
     //pop_sprite
     gfx_sprite_t * pop_sprite;
     gfx_sprite_t * pop_sprite_rotations[3];
@@ -121,7 +126,6 @@ void game(void) {
     gfx_sprite_t * lose_animation_behind;
     
     bool draw_behind_proj_sprite;
-    
     //grid settings
     max_color = 6;
     shift_rate = 7;
@@ -130,7 +134,6 @@ void game(void) {
     player_score = 0;
     fps = last_fps = 30;
     fps_string = malloc(15 * sizeof(char));
-
 
     //level
     level_number = 0;
@@ -157,7 +160,7 @@ void game(void) {
     shooter.projectile.color = shooter.next_bubbles[0];
     shooter.projectile.visible = false;
     shooter.projectile.angle = 0;
-    shooter_shake_x = shooter_shake_y = 0;
+    shooter.counter = 0;
     //grid
     grid.cols = 7;
     grid.rows = 17; //16 + deadzone
@@ -219,13 +222,17 @@ void game(void) {
     /*
      Note: Peform graphics buffer-using logic before clearing screen
      */
-    while (!(kb_Data[6] & kb_Clear)) {
+    while (!single_press(kb_clear_press, kb_clear_prev)) {
         kb_Scan();
+        kb_2nd_prev = kb_2nd_press;
+        kb_2nd_press = kb_Data[1] & kb_2nd;
+        kb_clear_prev = kb_clear_press;
+        kb_clear_press = kb_Data[6] & kb_Clear;
         if (game_flags & RENDER) {
             renderGrid(grid, grid_buffer);
             game_flags &= ~RENDER;
         }
-        gfx_FillScreen(255);  //Change render method to partial
+        gfx_FillScreen(255);  //Goal: change render method to partial
         if (game_flags & NEW_LEVEL) {
             if (!level_start_finished) {
                 prevkey = key;
@@ -235,7 +242,7 @@ void game(void) {
                     gfx_palette[0] = WHITE;
                 }
                 if (current_game == SURVIVAL) {
-                    level_type_text = game_mode_strings[SURVIVAL];
+                    level_type_text = option_strings[SURVIVAL];
                 } else if (current_game == LEVELS) {
                     level_type_text = "Level";
                 }

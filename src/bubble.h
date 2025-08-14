@@ -148,8 +148,9 @@ typedef struct shooter {
     projectile_t projectile; //may allow for multiple later
     uint8_t pal_index;
     uint8_t next_bubbles[3];
-    uint8_t flags; // NULL,NULL,NULL,NULL,NULL,Redraw?,Deactivate shooter?,Active projectile?
+    uint8_t flags; // NULL,NULL,NULL,NULL,Shake?,Redraw?,Deactivate shooter?,Active projectile?
     float ** vectors;
+    uint8_t counter;
 } shooter_t;
 
 char * uint8_to_bin(uint8_t n);

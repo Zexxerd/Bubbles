@@ -11,7 +11,7 @@
 
 #define TILE_WIDTH 16
 #define TILE_HEIGHT 16
-#define ROW_HEIGHT ((TILE_HEIGHT>>1)+(TILE_HEIGHT>>2)) // 3/4 of the tile height
+#define ROW_HEIGHT ((TILE_HEIGHT >> 1) + (TILE_HEIGHT >> 2)) // 3/4 of the tile height
 #define deg(a) (a * (180 / M_PI))
 #define rad(a) (a * (M_PI / 180))
 
