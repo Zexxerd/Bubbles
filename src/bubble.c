@@ -9,9 +9,6 @@
 #include <keypadc.h>
 #include "bubble.h"
 
-#define TILE_WIDTH 16
-#define TILE_HEIGHT 16
-#define ROW_HEIGHT ((TILE_HEIGHT >> 1) + (TILE_HEIGHT >> 2)) // 3/4 of the tile height
 #define deg(a) (a * (180 / M_PI))
 #define rad(a) (a * (M_PI / 180))
 
@@ -24,8 +21,10 @@ unsigned int push_down_time;
 uint8_t shift_rate;
 uint8_t * available_colors;
 
-//bool debug_flag;
+#ifdef DEBUG
+bool debug_flag;
 char string[100];
+#endif
 
 bool pop_started; //handles initial condition
 point_t * pop_locations;
@@ -36,7 +35,6 @@ bool fall_started;
 falling_bubble_list_t fall_data;
 int fall_total;
 uint8_t fall_counter;// timer for fall animation
-
 
 uint8_t game_flags;
 
@@ -290,13 +288,20 @@ float ** generateVectors(int8_t lower, int8_t higher, uint8_t step) {
 
 void renderShooter(shooter_t shooter) {
     point_t center;
+    point_t shooter_pos;
+    shooter_pos.x = shooter.x;
+    shooter_pos.y = shooter.y;
+    if (shooter.flags & SHAKE) {
+        shooter_pos.x += (int8_t)(shooter.shake_values << 4) >> 4;
+        shooter_pos.y += ((int8_t)shooter.shake_values >> 4);
+    }
     center.x = shooter.x + (TILE_WIDTH >> 1);
     center.y = shooter.y + (TILE_HEIGHT >> 1);
     gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]], 255 - (((timer_1_Counter>>2)&15)<<2));
     gfx_SetColor(shooter.pal_index);
     gfx_Line(center.x,center.y,center.x + TILE_WIDTH1_5 * shooter.vectors[0][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)],center.y - TILE_HEIGHT1_5 * shooter.vectors[1][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)]);
     //gfx_palette[shooter->pal_index] = bubble_colors[shooter->next_bubbles[0]];
-    gfx_TransparentSprite(bubble_sprites[shooter.next_bubbles[0]],shooter.x,shooter.y);
+    gfx_TransparentSprite(bubble_sprites[shooter.next_bubbles[0]],shooter_pos.x, shooter_pos.y);
     gfx_SetColor((sizeof_bubble_pal>>1)+shooter.next_bubbles[1]);
     gfx_FillCircle(center.x - 15,center.y + 6,5);
     gfx_SetColor((sizeof_bubble_pal>>1)+shooter.next_bubbles[2]);
@@ -359,8 +364,11 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
     uint8_t i,j;
     uint8_t index; //uint8_t or int
     bubble_list_t cluster;
-    point_t gridpos, back_coords, debug_coords;
+    point_t gridpos, back_coords;
 
+#ifdef DEBUG
+    point_t debug_coords;
+#endif
     gridpos = getGridPosition(shooter->projectile.x + (TILE_WIDTH>>1) - grid.x,
                               shooter->projectile.y + (TILE_HEIGHT>>1) - grid.y);
     addtile = false;

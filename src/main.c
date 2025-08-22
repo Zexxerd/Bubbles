@@ -47,16 +47,15 @@ char option_strings[4][18] = {
 };
 int option_lengths[4];
 
+bool kb_2nd_press, kb_2nd_prev; 
+bool kb_clear_press, kb_clear_prev; 
+
+
 int main(void) {
     //int i,j,k;
     //point_t point;
     uint16_t saved_palette[256];
-    enum {
-        LOSE = 1,
-        WIN = 2,
-        NEXT_LEVEL = 4,
-        PAUSE = 8
-    } game_result;
+
     option_lengths[0] = gfx_GetStringWidth(option_strings[0]);
     option_lengths[1] = gfx_GetStringWidth(option_strings[1]);
     //option_lengths[2] = gfx_GetStringWidth(option_strings[2]);
@@ -68,8 +67,6 @@ int main(void) {
     bool gfx_pal_modified = false; //true if gfx_palette != saved_palette
     uint8_t option = 0;
     quit = false;
-
-    bool kb_2nd_press = false, kb_2nd_prev = false; 
     uint8_t arrow_timer = 0;
 
     gfx_palette[255] = 0xFFFF;
@@ -82,22 +79,28 @@ int main(void) {
     int logo_top = centery_image(LCD_HEIGHT, bubbles_logo_height);
     int dark = 0;
     int bright = 0;
-    /*memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
-    memset(gfx_palette, 0, sizeof(uint16_t) * 256);
-    gfx_pal_modified = true;*/
+
     gfx_pal_modified = true;
     while (true) {
         kb_Scan();
         kb_2nd_prev = kb_2nd_press;
         kb_2nd_press = kb_Data[1] & kb_2nd;
+        kb_clear_prev = kb_clear_press;
+        kb_clear_press = kb_Data[6] & kb_Clear;
         if (logo_top > 20) {
+            if (single_press(kb_2nd_press, kb_2nd_prev)) {
+                logo_top = 20;
+                memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
+                gfx_pal_modified = false;
+                at_logo = false;
+            }
             if (dark < 255) {
                 fade_in(saved_palette, &dark, 10);
-                if (dark == 255) {
-                    fade_in(saved_palette, &dark, 10);
+            } else {
+                if (gfx_pal_modified) {
+                    memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                     gfx_pal_modified = false;
                 }
-            } else {
                 logo_top -= 5;
                 if (logo_top < 20) {
                     logo_top = 20;
@@ -111,8 +114,8 @@ int main(void) {
                 } else if (kb_Data[7] & kb_Up) {
                     option -= option ? 1 : 0;
                 } else if (kb_Data[7] & kb_Down) {
-                    option += (option > 1) ? 1 : 0;
-                } else if (kb_Data[6] & kb_Clear) {
+                    option += (option < 1) ? 1 : 0;
+                } else if (single_press(kb_clear_press, kb_clear_prev)) {
                     quit = true;
                 }
                 //fade_in(saved_palette, &dark, 5);
@@ -143,10 +146,14 @@ int main(void) {
                         }
                         gfx_FillScreen(0xFF);
                         memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
+                        gfx_BlitBuffer();
                         gfx_pal_modified = false;
                         //while(!os_GetCSC());
                         game();
+                        option_selected = false;
                     }
+                } else {
+                    option = 0;
                 }
             }
         }
@@ -155,10 +162,11 @@ int main(void) {
         gfx_TransparentSprite(bubbles_logo, logo_left, logo_top);
         gfx_SetTransparentColor(0x00);
         if (!at_logo) {
+            gfx_SetTextScale(2, 2);
             for (int i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) {
-                gfx_PrintStringXY(option_strings[i], 120, 100 + i * 12);
+                gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
             }
-            gfx_PrintStringXY(">", 112, 100 + option * 12);
+            gfx_PrintStringXY(">", 80, 100 + option * 24);
         }
         if (quit) {
             break;

@@ -71,6 +71,9 @@ extern bool quit;
 extern char lose_string[];
 extern char option_strings[4][18];
 
+extern bool kb_2nd_press, kb_2nd_prev;
+extern bool kb_clear_press, kb_clear_prev;
+
 void game(void) {
     int i,j,k; //universal counter
     point_t point;
@@ -83,9 +86,6 @@ void game(void) {
     float fps, last_fps, ticks;
     char * fps_string;
     
-    uint8_t shooter_shake_x;
-    uint8_t shooter_shake_y;
-
 #ifdef DEBUG
     uint8_t x, y;
     uint8_t highlight_timer;
@@ -114,8 +114,6 @@ void game(void) {
     gfx_sprite_t * behind_proj_sprite;
     
     //key presses
-    bool kb_2nd_press, kb_2nd_prev;
-    bool kb_clear_press, kb_clear_prev;
 
     //pop_sprite
     gfx_sprite_t * pop_sprite;
@@ -224,6 +222,8 @@ void game(void) {
      */
     while (!single_press(kb_clear_press, kb_clear_prev)) {
         kb_Scan();
+        prevkey = key;
+        key = kb_AnyKey();
         kb_2nd_prev = kb_2nd_press;
         kb_2nd_press = kb_Data[1] & kb_2nd;
         kb_clear_prev = kb_clear_press;
@@ -235,8 +235,6 @@ void game(void) {
         gfx_FillScreen(255);  //Goal: change render method to partial
         if (game_flags & NEW_LEVEL) {
             if (!level_start_finished) {
-                prevkey = key;
-                key = kb_AnyKey();
                 gfx_SetTextScale(4, 4);
                 if (level_start_y_pos == 0) {
                     gfx_palette[0] = WHITE;
@@ -256,7 +254,7 @@ void game(void) {
                     gfx_PrintStringXY(level_type_text, 0, level_start_y_pos);
                     gfx_PrintUIntXY(level_number + 1, level_number_len, gfx_GetStringWidth(level_type_text), level_start_y_pos);
                 }
-                if ((!key && prevkey) && (level_start_y_pos >= 40)) {
+                if (single_release(key, prevkey) && (level_start_y_pos >= 40)) {
                     gfx_palette[0] = BLACK;
                     gfx_SetTextScale(1, 1);
                     shooter.flags &= ~DEACTIVATED;
@@ -275,57 +273,57 @@ void game(void) {
                 }
             }
         }
-        if (!(shooter.flags & DEACTIVATED)) {
-            if (kb_Data[7] & kb_Left) {
+        if (kb_Data[7] & kb_Left) {
 #ifdef DEBUG
-                x -= (x > 0);
+            x -= (x > 0);
 #endif
-                if (shooter.angle > LBOUND) {
-                    shooter.angle -= SHOOTER_STEP;
-                    //shooter.flags |= REDRAW_SHOOTER;
-                }
-                
+            if (shooter.angle > LBOUND) {
+                shooter.angle -= SHOOTER_STEP;
+                //shooter.flags |= REDRAW_SHOOTER;
             }
-            if (kb_Data[7] & kb_Right) {
+            
+        }
+        if (kb_Data[7] & kb_Right) {
 #ifdef DEBUG
-                x += (x < grid.cols-1);
+            x += (x < grid.cols-1);
 #endif
-                if (shooter.angle < RBOUND) {
-                    shooter.angle += SHOOTER_STEP;
-                    //shooter.flags |= REDRAW_SHOOTER;
-                }
+            if (shooter.angle < RBOUND) {
+                shooter.angle += SHOOTER_STEP;
+                //shooter.flags |= REDRAW_SHOOTER;
             }
+        }
 #ifdef DEBUG
-            if (kb_Data[7] & kb_Up)
-                y -= (y > 0);
-            if (kb_Data[7] & kb_Down)
-                y += (y < grid.rows - 1);
+        if (kb_Data[7] & kb_Up)
+            y -= (y > 0);
+        if (kb_Data[7] & kb_Down)
+            y += (y < grid.rows - 1);
 #endif
-            /*Shoot bubbles*/
-            if (kb_Data[1] & kb_2nd) {
-                if (!(shooter.flags & DEACTIVATED)) { // implement shaking animation?
-                    if (!(shooter.flags & ACTIVE_PROJ)) {
-                        if (grid.possible_collisions.size) {
-                            shooter.projectile.x = shooter.x;
-                            shooter.projectile.y = shooter.y;
-                            shooter.projectile.speed = 5;
-                            shooter.projectile.angle = shooter.angle;
-                            shooter.projectile.color = shooter.next_bubbles[0];
-                            shooter.next_bubbles[0] = shooter.next_bubbles[1];
-                            shooter.next_bubbles[1] = shooter.next_bubbles[2];
-                            available_colors = getAvailableColors(grid);
-                            if (!available_colors[0]) {
-                                available_colors[0] = 1;
-                                available_colors[1] = 0;
-                            }
-                            shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
-                            shooter.projectile.visible = true;
-                            shooter.flags |= ACTIVE_PROJ;
+        /*Shoot bubbles*/
+        if (kb_Data[1] & kb_2nd) {
+            if (!(shooter.flags & DEACTIVATED)) { // implement shaking animation?
+                if (!(shooter.flags & ACTIVE_PROJ)) {
+                    if (grid.possible_collisions.size) {
+                        shooter.projectile.x = shooter.x;
+                        shooter.projectile.y = shooter.y;
+                        shooter.projectile.speed = 5;
+                        shooter.projectile.angle = shooter.angle;
+                        shooter.projectile.color = shooter.next_bubbles[0];
+                        shooter.next_bubbles[0] = shooter.next_bubbles[1];
+                        shooter.next_bubbles[1] = shooter.next_bubbles[2];
+                        available_colors = getAvailableColors(grid);
+                        if (!available_colors[0]) {
+                            available_colors[0] = 1;
+                            available_colors[1] = 0;
                         }
+                        shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
+                        shooter.projectile.visible = true;
+                        shooter.flags |= ACTIVE_PROJ;
                     }
-                } else {
-                    
                 }
+            } else {
+                dbg_printf("shooter is deactivated, cannot shoot\n");
+                shooter.flags |= SHAKE; //start shaking animation
+                shooter.counter = (uint8_t) fps / 3; //shake for 1/3 second
             }
         }
         
@@ -462,6 +460,10 @@ void game(void) {
         if (kb_Data[6] & kb_Power) {
             push_down_time++;
         }
+        /*Debug: Set deactivated*/
+        if (kb_Data[2] & kb_Square) {
+            shooter.flags ^= DEACTIVATED;
+        }
 #endif //DEBUG
         if (game_flags & POP) {
             if (!pop_started) {
@@ -556,6 +558,17 @@ void game(void) {
         
         //Display
         if (!(game_flags & NEW_LEVEL) && (current_game == SURVIVAL)) {
+            if (shooter.flags & SHAKE) {
+                dbg_printf("shaker: (%d, %d) %d\n",(shooter.shake_values & 0xF0) >> 4, shooter.shake_values & 0x0F, shooter.counter);
+                if (!shooter.counter) {
+                    shooter.flags &= ~SHAKE;
+                } else {
+                    shooter.shake_values = (randInt(-4, 4) << 4) | randInt(-4, 4);
+                    shooter.counter--;
+                }
+            } else {
+                shooter.shake_values = 0;
+            }
             renderShooter(shooter);
             gfx_TransparentSprite(grid_buffer,grid.x,grid.y);
             gfx_SetColor(0);
@@ -669,9 +682,6 @@ void game(void) {
         gfx_SetTextFGColor(0);
         gfx_BlitBuffer();
         if (lost || won) break;
-        if (kb_Data[6] & kb_Clear) {
-            quit = true;
-        }
     }
     if (lost) {
         //init partial redraw
@@ -703,9 +713,17 @@ void game(void) {
             gfx_BlitBuffer();
         }
         while (!os_GetCSC());
+        free(lose_animation_behind);
     }
     game_flags = 0x00;
     shooter.flags = 0x00;
     shooter.projectile.x = shooter.projectile.y = shooter.projectile.speed = shooter.projectile.color = 0;
     free(grid.bubbles);
+    free(grid_buffer);
+    free(available_colors);
+    free(fall_data.bubbles);
+    free(fps_string);
+    for (i = 0; i < 3; i++) {
+        free(pop_sprite_rotations[i]);
+    }
 }

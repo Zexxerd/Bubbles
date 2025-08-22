@@ -52,6 +52,8 @@
 #define ACTIVE_PROJ    (1<<0)
 #define DEACTIVATED    (1<<1)
 #define REDRAW_SHOOTER (1<<2)
+#define SHAKE (1<<3)
+
 
 //grid
 #define RENDER    (1<<0) // redraw grid
@@ -151,6 +153,7 @@ typedef struct shooter {
     uint8_t flags; // NULL,NULL,NULL,NULL,Shake?,Redraw?,Deactivate shooter?,Active projectile?
     float ** vectors;
     uint8_t counter;
+    int8_t shake_values; //lower 4 bits are x, upper 4 bits are y
 } shooter_t;
 
 char * uint8_to_bin(uint8_t n);
