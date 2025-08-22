@@ -761,5 +761,4 @@ void game(void) {
         free(pop_cluster.bubbles);
     }
     free(shooter.vectors);
-    gfx_End();
 }
