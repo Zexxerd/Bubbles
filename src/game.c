@@ -67,7 +67,9 @@ extern falling_bubble_list_t fall_data;
 extern int fall_total;
 extern uint8_t fall_counter;
 
+extern enum game_mode current_game;
 extern bool quit;
+extern char win_string[];
 extern char lose_string[];
 extern char option_strings[4][18];
 
@@ -85,7 +87,7 @@ void game(void) {
     float fps_ratio;
     float fps, last_fps, ticks;
     char * fps_string;
-    
+    char * end_of_game_string;
 #ifdef DEBUG
     uint8_t x, y;
     uint8_t highlight_timer;
@@ -99,7 +101,6 @@ void game(void) {
     //exit(1);
 #endif //DEBUG
     
-    enum game_mode current_game;
     //level
     uint8_t level_number;
     uint8_t level_number_len;
@@ -127,7 +128,11 @@ void game(void) {
     //grid settings
     max_color = 6;
     shift_rate = 7;
-    push_down_time = 6;
+    if (current_game == SURVIVAL) {
+        push_down_time = (1<<sizeof(int))-1; //max int
+    } else {
+        push_down_time = 6;
+    }
     turn_counter = 0;
     player_score = 0;
     fps = last_fps = 30;
@@ -139,7 +144,6 @@ void game(void) {
     level_start_finished = false;
     level_start_y_pos = 0;
     level_type_text = "";
-    current_game = SURVIVAL;
 
     //shooter
     shooter.x = 160 - (TILE_WIDTH >> 1);
@@ -165,7 +169,6 @@ void game(void) {
     grid.x = centerX(((TILE_WIDTH * grid.cols) + (TILE_WIDTH >> 1)), LCD_WIDTH);
     grid.y = 0;
     grid.ball_diameter = TILE_WIDTH;
-    game_flags = RENDER | NEW_LEVEL;
     grid.width = (TILE_WIDTH * grid.cols) + (TILE_WIDTH>>1);
     grid.height = (ROW_HEIGHT * grid.rows) + (TILE_WIDTH>>2);
     grid.bubbles = (bubble_t *) malloc((grid.cols*grid.rows) * sizeof(bubble_t));
@@ -174,7 +177,8 @@ void game(void) {
     //declare an image buffer for the grid
     grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * grid.rows + (TILE_WIDTH>>2));
     if (grid_buffer == NULL) exit(1);
-    
+    game_flags = RENDER | NEW_LEVEL;
+
     srand(rtc_Time());
     available_colors = (uint8_t *) malloc(8 * sizeof(uint8_t));
     setAvailableColors(available_colors, 0x7F);
@@ -239,10 +243,16 @@ void game(void) {
                 if (level_start_y_pos == 0) {
                     gfx_palette[0] = WHITE;
                 }
-                if (current_game == SURVIVAL) {
-                    level_type_text = option_strings[SURVIVAL];
-                } else if (current_game == LEVELS) {
-                    level_type_text = "Level";
+                switch (current_game) {
+                    case SURVIVAL:
+                        level_type_text = option_strings[SURVIVAL];
+                        break;
+                    case LEVELS:
+                        level_type_text = "Level";
+                        break;
+                    default:
+                        level_type_text = "";
+                        break;
                 }
                 if (level_start_y_pos < 64) {
                     gfx_palette[0] = ((32 - (level_start_y_pos >> 1)) << 11) | ((64 - level_start_y_pos) << 5) | (32 - (level_start_y_pos >> 1));
@@ -300,7 +310,7 @@ void game(void) {
 #endif
         /*Shoot bubbles*/
         if (kb_Data[1] & kb_2nd) {
-            if (!(shooter.flags & DEACTIVATED)) { // implement shaking animation?
+            if (!(shooter.flags & DEACTIVATED)) {
                 if (!(shooter.flags & ACTIVE_PROJ)) {
                     if (grid.possible_collisions.size) {
                         shooter.projectile.x = shooter.x;
@@ -318,6 +328,11 @@ void game(void) {
                         shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
                         shooter.projectile.visible = true;
                         shooter.flags |= ACTIVE_PROJ;
+                    } else {
+                        if (!(game_flags & POP)) {
+                            shooter.flags |= SHAKE;
+                            shooter.counter = (uint8_t) fps / 3;
+                        }
                     }
                 }
             } else {
@@ -476,7 +491,7 @@ void game(void) {
                 pop_sprite = bubble_pop_sprites[pop_cluster.bubbles[0].color];
                 pop_sprite_rotations[0] = gfx_FlipSpriteY(pop_sprite,pop_sprite_rotations[0]);
                 pop_sprite_rotations[1] = gfx_FlipSpriteX(pop_sprite,pop_sprite_rotations[1]);
-                pop_sprite_rotations[2] =  gfx_FlipSpriteX(pop_sprite_rotations[0],pop_sprite_rotations[2]);
+                pop_sprite_rotations[2] = gfx_FlipSpriteX(pop_sprite_rotations[0],pop_sprite_rotations[2]);
                 for (i = 0;i < pop_cluster.size;i++) {
                     point = getTileCoordinate(pop_cluster.bubbles[i].x,pop_cluster.bubbles[i].y);
                     pop_locations[i].x = point.x + grid.x;
@@ -543,6 +558,15 @@ void game(void) {
         }
         if (game_flags & CHECK) {
             grid.possible_collisions = getPossibleCollisions(grid);
+            if (grid.possible_collisions.size == 0) {
+                switch (current_game) {
+                    case SURVIVAL:
+                        shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
+                        break;
+                    default:
+                        break;
+                }
+            }
             game_flags &= ~CHECK;
         }
         //Move the projectile
@@ -683,8 +707,9 @@ void game(void) {
         gfx_BlitBuffer();
         if (lost || won) break;
     }
-    if (lost) {
+    if (lost | won) {
         //init partial redraw
+        end_of_game_string = won ? win_string : lose_string;
         k = 1;
         i = gfx_GetStringWidth(lose_string);
         lose_animation_behind = gfx_MallocSprite(i,8);
@@ -714,6 +739,11 @@ void game(void) {
         }
         while (!os_GetCSC());
         free(lose_animation_behind);
+    } else if (won) {
+        gfx_SetTextScale(5, 5);
+        gfx_PrintStringXY("You won!", (LCD_WIDTH >> 1) - 32, (LCD_HEIGHT >> 1) - 16);
+        gfx_BlitBuffer();
+        while (!os_GetCSC());
     }
     game_flags = 0x00;
     shooter.flags = 0x00;
@@ -726,4 +756,10 @@ void game(void) {
     for (i = 0; i < 3; i++) {
         free(pop_sprite_rotations[i]);
     }
+    if (pop_started) {
+        free(pop_locations);
+        free(pop_cluster.bubbles);
+    }
+    free(shooter.vectors);
+    gfx_End();
 }

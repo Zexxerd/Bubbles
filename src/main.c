@@ -35,10 +35,13 @@
 
 extern const uint16_t bubble_colors[7];
 
+enum game_mode current_game;
 bool lost, won;
 bool quit;
 
 char lose_string[] = "You Lose!";
+char win_string[] = "You Win!";
+
 char option_strings[4][18] = {
     "SURVIVAL!",
     "LEVELS",
@@ -136,6 +139,7 @@ int main(void) {
                         gfx_pal_modified = false;
                     }
                     if (!quit) {
+                        current_game = SURVIVAL;
                         bright = 255;
                         gfx_pal_modified = true;
                         while (bright > 0) {
