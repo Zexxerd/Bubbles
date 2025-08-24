@@ -68,11 +68,17 @@ int main(void) {
     bool booted = false; //
     bool option_selected = false;
     bool gfx_pal_modified = false; //true if gfx_palette != saved_palette
+    uint8_t show_levels_not_implemented = false; //true if user selected levels option
+    //bool show_versus_not_implemented = false; //true if user selected versus option
     uint8_t option = 0;
     quit = false;
+    int generic_timer = 0;
     uint8_t arrow_timer = 0;
 
+    const uint8_t levels_not_implemented_color_index = (sizeof_bubble_pal >> 1) + 7;
     gfx_palette[255] = 0xFFFF;
+    gfx_palette[levels_not_implemented_color_index] = 0x0000;
+
     gfx_Begin();
     gfx_SetDrawBuffer();
     gfx_SetPalette(bubble_pal, sizeof_bubble_pal, 0);
@@ -144,6 +150,7 @@ int main(void) {
                         current_game = SURVIVAL;
                         bright = 255;
                         gfx_pal_modified = true;
+                        gfx_SetTextFGColor(0);
                         while (bright > 0) {
                             bright -= 5;
                             for (int i = 0; i < 256; i++) {
@@ -159,7 +166,10 @@ int main(void) {
                         option_selected = false;
                     }
                 } else {
-                    option = 0;
+                    show_levels_not_implemented = !show_levels_not_implemented;
+                    gfx_palette[levels_not_implemented_color_index] = BLACK;
+                    generic_timer = 0;
+                    option_selected = false;
                 }
             }
         }
@@ -169,11 +179,30 @@ int main(void) {
         gfx_SetTransparentColor(0x00);
         if (!at_logo) {
             gfx_SetTextScale(2, 2);
+            gfx_SetTextFGColor(0);
             for (unsigned int i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) {
                 gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
             }
             gfx_PrintStringXY(">", 80, 100 + option * 24);
         }
+        if (show_levels_not_implemented) {
+            gfx_SetTextScale(1, 1);
+            gfx_SetTextFGColor((sizeof_bubble_pal >> 1) + 7);
+            gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
+            if (single_press(kb_2nd_press, kb_2nd_prev)) {
+                show_levels_not_implemented = false;
+            }
+            if (generic_timer++ > 30) {
+                gfx_SetTextFGColor(levels_not_implemented_color_index);
+                bright = 255 - (generic_timer - 30) * 5;
+                gfx_palette[levels_not_implemented_color_index] = gfx_Lighten(gfx_palette[levels_not_implemented_color_index], bright);
+                if (bright <= 0) {
+                    gfx_palette[levels_not_implemented_color_index] = BLACK;
+                    show_levels_not_implemented = false;
+                    generic_timer = 0;
+                }
+            }
+        }   
         if (quit) {
             break;
         }

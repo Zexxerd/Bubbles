@@ -126,7 +126,7 @@ void game(void) {
     
     bool draw_behind_proj_sprite;
     //grid settings
-    max_color = 6;
+    max_color = 4; //max color index, 0 to max_color inclusive
     shift_rate = 10;
     if (current_game == SURVIVAL) {
         push_down_time = 16777215; //max int
