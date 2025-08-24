@@ -78,6 +78,7 @@ int main(void) {
     gfx_SetPalette(bubble_pal, sizeof_bubble_pal, 0);
     gfx_SetPalette(bubble_colors, 14, sizeof_bubble_pal >> 1);
     gfx_SetPalette(bubbles_logo_pal, sizeof_bubbles_logo_pal, 49);
+    memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
     int logo_left = centerx_image(LCD_WIDTH, bubbles_logo_width);
     int logo_top = centery_image(LCD_HEIGHT, bubbles_logo_height);
     int dark = 0;
@@ -96,18 +97,19 @@ int main(void) {
                 memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                 gfx_pal_modified = false;
                 at_logo = false;
-            }
-            if (dark < 255) {
-                fade_in(saved_palette, &dark, 10);
             } else {
-                if (gfx_pal_modified) {
-                    memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
-                    gfx_pal_modified = false;
-                }
-                logo_top -= 5;
-                if (logo_top < 20) {
-                    logo_top = 20;
-                    at_logo = false;
+                if (dark < 255) {
+                    fade_in(saved_palette, &dark, 10);
+                } else {
+                    if (gfx_pal_modified) {
+                        memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
+                        gfx_pal_modified = false;
+                    }
+                    logo_top -= 5;
+                    if (logo_top < 20) {
+                        logo_top = 20;
+                        at_logo = false;
+                    }
                 }
             }
         } else {
@@ -167,7 +169,7 @@ int main(void) {
         gfx_SetTransparentColor(0x00);
         if (!at_logo) {
             gfx_SetTextScale(2, 2);
-            for (int i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) {
+            for (unsigned int i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) {
                 gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
             }
             gfx_PrintStringXY(">", 80, 100 + option * 24);

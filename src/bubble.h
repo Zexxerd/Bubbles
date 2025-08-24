@@ -76,11 +76,15 @@ gfx_PrintInt(i,length);                      \
 } while (0)
 
 //basic debug message
+#ifdef DEBUG
 #define debug_message(message)  \
 gfx_FillScreen(255);             \
 gfx_PrintStringXY(message,0,116); \
 gfx_BlitBuffer();                  \
 while (!os_GetCSC())
+#else
+#define debug_message(message) do {} while (0)
+#endif
 
 //explicitly associated with debug.h
 #define dbg_getlocation(pointer) do {\
@@ -162,7 +166,7 @@ bubble_t newBubble(uint8_t x,uint8_t y,uint8_t color,uint8_t flags);
 bubble_list_t copyBubbleList(bubble_list_t original);
 bubble_list_t * addToBubbleList(bubble_list_t * dest, bubble_list_t * src);
 void setAvailableColors(uint8_t * target,uint8_t colors);
-uint8_t * getAvailableColors(grid_t grid);
+uint8_t * getAvailableColors(grid_t grid, uint8_t * buffer);
 void drawTile(uint8_t color,int x,int y);
 point_t getTileCoordinate(int col,int row);
 point_t getGridPosition(int x,int y);

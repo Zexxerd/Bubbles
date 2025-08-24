@@ -136,41 +136,37 @@ void setAvailableColors(uint8_t * target,uint8_t colors) {
     }
     target[0] = size;
 }
-uint8_t * getAvailableColors(grid_t grid) {
-    //Precondition: there is at least 1 bubble in grid
-    //Postcondition: returned array is set if uninitialized and filled with available colors in grid.
-    //the returned array is in size + data format
+uint8_t * getAvailableColors(grid_t grid, uint8_t * available_buffer) {
+    /**
+     * Precondition:  there is at least 1 bubble in grid
+     *                available_buffer is a valid array of MAX_POSSIBLE_COLOR + 2 bytes
+     * Postcondition: returned array is filled with available colors in grid.
+     *                the returned array is in size + data format
+    */
     uint8_t i,j,array_index;
     bool is_in;
-    static uint8_t * found_colors;
-    if (found_colors == NULL) {
-        found_colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR+2) * sizeof(uint8_t));
-        if (found_colors == NULL) {
-            exit(1); //oooooooooops!
-        }
-    }
     
-    memset(found_colors, 0xFF, (MAX_POSSIBLE_COLOR + 2));
+    memset(available_buffer, 0xFF, (MAX_POSSIBLE_COLOR + 2)); //size byte + colors + padding
     array_index = 1;
     for (i = 0; i < grid.rows * grid.cols; i++) {
         is_in = false;
         if (!(grid.bubbles[i].flags & EMPTY)) {
             for (j = 1;j < array_index;j++) {
-                if (grid.bubbles[i].color == found_colors[j]) {
+                if (grid.bubbles[i].color == available_buffer[j]) {
                     is_in = true;
                     break;
                 }
             }
             if (!is_in) {
-                found_colors[array_index++] = grid.bubbles[i].color;
+                available_buffer[array_index++] = grid.bubbles[i].color;
                 if (array_index > (MAX_POSSIBLE_COLOR+2)) {
                     exit(1);
                 }
             }
         }
     }
-    found_colors[0] = array_index - 1;
-    return found_colors;
+    available_buffer[0] = array_index - 1;
+    return available_buffer;
 }
 
 void drawTile(uint8_t color, int x, int y) {

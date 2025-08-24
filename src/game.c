@@ -127,9 +127,9 @@ void game(void) {
     bool draw_behind_proj_sprite;
     //grid settings
     max_color = 6;
-    shift_rate = 7;
+    shift_rate = 10;
     if (current_game == SURVIVAL) {
-        push_down_time = (1<<sizeof(int))-1; //max int
+        push_down_time = 16777215; //max int
     } else {
         push_down_time = 6;
     }
@@ -180,7 +180,7 @@ void game(void) {
     game_flags = RENDER | NEW_LEVEL;
 
     srand(rtc_Time());
-    available_colors = (uint8_t *) malloc(8 * sizeof(uint8_t));
+    available_colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR + 2) * sizeof(uint8_t));
     setAvailableColors(available_colors, 0x7F);
     initGrid(grid,grid.rows,grid.cols, 10, NULL);
     grid.possible_collisions = getPossibleCollisions(grid);
@@ -197,9 +197,19 @@ void game(void) {
     fall_counter = 0;
     fall_started = false;
     fall_data.bubbles = (falling_bubble_t *) malloc(grid.cols * grid.rows * sizeof(falling_bubble_t));
-    
+    if (fall_data.bubbles == NULL) {
+        debug_message("fall_data.bubbles alloc failed :O");
+        exit(1);
+    }
+    fall_data.size = 0;
+    fall_total = 0;
+
     //redraw
     behind_proj_sprite = gfx_MallocSprite(16, 16);
+    if (!behind_proj_sprite) {
+        debug_message("behind_proj_sprite alloc fail!!! >:(");
+        exit(1);
+    }
     draw_behind_proj_sprite = false;
     
     lost = false;
@@ -214,7 +224,7 @@ void game(void) {
     highlight_timer = 0;
 #endif
     gfx_FillScreen(255);
-    /*Initialize timer*/
+    /*Initialize timer*/ 
     timer_Control = TIMER1_DISABLE;
     timer_1_Counter = 0;
     timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
@@ -312,7 +322,7 @@ void game(void) {
         if (kb_Data[1] & kb_2nd) {
             if (!(shooter.flags & DEACTIVATED)) {
                 if (!(shooter.flags & ACTIVE_PROJ)) {
-                    if (grid.possible_collisions.size) {
+                    if (grid.possible_collisions.size || current_game != LEVELS) {
                         shooter.projectile.x = shooter.x;
                         shooter.projectile.y = shooter.y;
                         shooter.projectile.speed = 5;
@@ -320,7 +330,7 @@ void game(void) {
                         shooter.projectile.color = shooter.next_bubbles[0];
                         shooter.next_bubbles[0] = shooter.next_bubbles[1];
                         shooter.next_bubbles[1] = shooter.next_bubbles[2];
-                        available_colors = getAvailableColors(grid);
+                        getAvailableColors(grid, available_colors);
                         if (!available_colors[0]) {
                             available_colors[0] = 1;
                             available_colors[1] = 0;
@@ -506,7 +516,10 @@ void game(void) {
                 pop_started = false;
                 game_flags &= ~POP;
                 free(pop_locations);
+                pop_locations = NULL;
                 free(pop_cluster.bubbles);
+                pop_cluster.bubbles = NULL;
+                pop_cluster.size = 0;
             }
         }
         if (game_flags & FALL) {
@@ -516,8 +529,10 @@ void game(void) {
             }
             //Animate
             for (i = 0; i < fall_total; i++) {
-                fall_data.bubbles[i].x += (int8_t) fall_data.bubbles[i].velocity;
-                fall_data.bubbles[i].y += (fall_counter * 5) >> 2;
+                if (fall_data.bubbles[i].y < LCD_HEIGHT) {
+                    fall_data.bubbles[i].x += (int8_t) fall_data.bubbles[i].velocity;
+                    fall_data.bubbles[i].y += (fall_counter * 5) >> 2;
+                }
             }
             fall_counter++;
             if (fall_counter == 25) {
@@ -525,12 +540,6 @@ void game(void) {
                 fall_started = false;
                 game_flags &= ~FALL;
                 memset(fall_data.bubbles, 0, sizeof(falling_bubble_t) * fall_data.size);
-                /*for(i = 0;i < fall_data.size;i++) {
-                 fall_data.bubbles[i].x = 0;
-                 fall_data.bubbles[i].y = 0;
-                 fall_data.bubbles[i].color = 0;
-                 fall_data.bubbles[i].velocity = 0;
-                 }*/
             }
         }
         if (game_flags & CHECK) {
@@ -560,7 +569,8 @@ void game(void) {
             grid.possible_collisions = getPossibleCollisions(grid);
             if (grid.possible_collisions.size == 0) {
                 switch (current_game) {
-                    case SURVIVAL:
+                    case SURVIVAL: //goal: add a 40000pt bonus for clearing the board
+                        player_score += 40000;
                         shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
                         break;
                     default:
@@ -587,7 +597,7 @@ void game(void) {
                 if (!shooter.counter) {
                     shooter.flags &= ~SHAKE;
                 } else {
-                    shooter.shake_values = (randInt(-4, 4) << 4) | randInt(-4, 4);
+                    shooter.shake_values = (randInt(-2, 2) << 4) | randInt(-2, 2);
                     shooter.counter--;
                 }
             } else {
@@ -599,8 +609,9 @@ void game(void) {
             gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
             
             if (shooter.projectile.visible) {
+                /*
                 gfx_GetSprite(behind_proj_sprite,shooter.projectile.x,shooter.projectile.y);
-                draw_behind_proj_sprite = true;
+                draw_behind_proj_sprite = true;*/
                 gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
             }
             if (game_flags & RENDER) {
@@ -617,13 +628,15 @@ void game(void) {
                     }
                     point.x = pop_locations[i].x - pop_counter;
                     point.y = pop_locations[i].y - pop_counter;
-                    gfx_TransparentSprite(pop_sprite,point.x,point.y);
-                    point.x = pop_locations[i].x + pop_counter + (TILE_WIDTH>>1);
-                    gfx_TransparentSprite(pop_sprite_rotations[0],point.x,point.y);
-                    point.y = pop_locations[i].y + pop_counter + (TILE_WIDTH>>1);
-                    gfx_TransparentSprite(pop_sprite_rotations[2],point.x,point.y);
-                    point.x = pop_locations[i].x - pop_counter;
-                    gfx_TransparentSprite(pop_sprite_rotations[1],point.x,point.y);
+                    if (pop_counter & 2 || !pop_counter) {
+                        gfx_TransparentSprite(pop_sprite,point.x,point.y);
+                        point.x = pop_locations[i].x + pop_counter + (TILE_WIDTH>>1);
+                        gfx_TransparentSprite(pop_sprite_rotations[0],point.x,point.y);
+                        point.y = pop_locations[i].y + pop_counter + (TILE_WIDTH>>1);
+                        gfx_TransparentSprite(pop_sprite_rotations[2],point.x,point.y);
+                        point.x = pop_locations[i].x - pop_counter;
+                        gfx_TransparentSprite(pop_sprite_rotations[1],point.x,point.y);
+                    }
                 }
             }
             if (game_flags & FALL) {
@@ -649,7 +662,13 @@ void game(void) {
             gfx_PrintStringXY("Shift rate:",0,32);
             gfx_PrintUIntXY(shift_rate,3,74,32);
             gfx_PrintStringXY("Push time:",0,40);
-            gfx_PrintUIntXY(push_down_time,3,74,40);
+            if (push_down_time == 16777215) {
+                gfx_PrintStringXY("Max", 74, 40);
+            } else if (push_down_time == 0) {
+                gfx_PrintStringXY("zd", 74, 40);
+            } else {
+                gfx_PrintIntXY(push_down_time,3,74,40);
+            }
             gfx_PrintStringXY("Score: ",0,48);
             gfx_SetTextXY(60,48);
             gfx_PrintInt(player_score,5);
@@ -707,16 +726,25 @@ void game(void) {
         gfx_BlitBuffer();
         if (lost || won) break;
     }
+    //End of game animation
     if (lost | won) {
         //init partial redraw
-        end_of_game_string = won ? win_string : lose_string;
+        end_of_game_string = lost ? lose_string : win_string;
         k = 1;
-        i = gfx_GetStringWidth(lose_string);
+        i = gfx_GetStringWidth(end_of_game_string);
         lose_animation_behind = gfx_MallocSprite(i,8);
+        if (lose_animation_behind == NULL) {
+            debug_message("lose_animation_behind null!!!! :(");
+            gfx_FillScreen(255);
+            gfx_PrintStringXY(end_of_game_string, 0, 0);
+            gfx_BlitBuffer();
+            while (!os_GetCSC());
+            exit(1);
+        }
         point.x = (LCD_WIDTH>>1)-(i>>1);
         point.y = (LCD_HEIGHT>>1)-4;
         gfx_GetSprite(lose_animation_behind,point.x,point.y);
-        gfx_PrintStringXY(lose_string,point.x,point.y);
+        gfx_PrintStringXY(end_of_game_string,point.x,point.y);
         while (k < 4) {
             timer_Control = TIMER1_DISABLE;
             timer_1_Counter = 0;
@@ -727,23 +755,27 @@ void game(void) {
             gfx_Sprite(lose_animation_behind,point.x,point.y);
             free(lose_animation_behind);
             //movement code
-            gfx_SetTextScale(k,k);
-            i = gfx_GetStringWidth(lose_string);
-            lose_animation_behind = gfx_MallocSprite(i,k<<3);
+            gfx_SetTextScale(k, k);
+            i = gfx_GetStringWidth(end_of_game_string);
+            lose_animation_behind = gfx_MallocSprite(i, k<<3);
+            if (lose_animation_behind == NULL) {
+                debug_message("lose_animation_behind null :O");
+                gfx_FillScreen(255);
+                gfx_PrintStringXY(end_of_game_string, 0, 0);
+                gfx_BlitBuffer();
+                while (!os_GetCSC());
+                exit(1);
+            }
             point.x = (LCD_WIDTH>>1)-(i>>1);
             point.y = (LCD_HEIGHT>>1)-(4*k);
             //get new background and print new sprite/string
             gfx_GetSprite(lose_animation_behind,point.x,point.y);
-            gfx_PrintStringXY(lose_string,point.x,point.y);
+            gfx_PrintStringXY(end_of_game_string,point.x,point.y);
             gfx_BlitBuffer();
         }
         while (!os_GetCSC());
+        dbg_printf("exiting game loop\n");
         free(lose_animation_behind);
-    } else if (won) {
-        gfx_SetTextScale(5, 5);
-        gfx_PrintStringXY("You won!", (LCD_WIDTH >> 1) - 32, (LCD_HEIGHT >> 1) - 16);
-        gfx_BlitBuffer();
-        while (!os_GetCSC());
     }
     game_flags = 0x00;
     shooter.flags = 0x00;
@@ -752,6 +784,8 @@ void game(void) {
     free(grid_buffer);
     free(available_colors);
     free(fall_data.bubbles);
+    fall_data.bubbles = NULL;
+    fall_data.size = fall_total = 0;
     free(fps_string);
     for (i = 0; i < 3; i++) {
         free(pop_sprite_rotations[i]);
@@ -760,5 +794,4 @@ void game(void) {
         free(pop_locations);
         free(pop_cluster.bubbles);
     }
-    free(shooter.vectors);
 }
