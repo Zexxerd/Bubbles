@@ -237,10 +237,13 @@ void pushDown(grid_t * grid) {
 }
 
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
-    /*Uses the drawing buffer to render the grid to the grid_buffer sprite. This sprite can be drawn later as many times as needed.*/
-    /*Precondition: grid.cols is less than 20 (LCD_WIDTH/TILE_WIDTH)
-                    grid.rows is less than 26 (LCD_HEIGHT/ROW_HEIGHT)
-                    Product of grid.cols and grid.rows is less than 257*/
+    /**
+     * Uses the drawing buffer to render the grid to the grid_buffer sprite.
+     * This sprite can be drawn later as many times as needed.
+     * @note grid.cols needs to be less than 20 (LCD_WIDTH/TILE_WIDTH)
+     * @note grid.rows needs to be less than 26 (LCD_HEIGHT/ROW_HEIGHT)
+     * Product of grid.cols and grid.rows is less than 257
+     */
     int i,j;
     bubble_t tile;
     point_t coord;
@@ -262,22 +265,25 @@ void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
 float ** generateVectors(int8_t lower, int8_t higher, uint8_t step) {
     //Generates an array of trigonometric vector coordinates for shooter to use.
     static float ** vectors;
-    uint8_t size;
+    int size;
     int i;
-    uint8_t j;
+    int j;
     size = (((int) higher) - lower) / step + 1; //(64 - -64) / 4 + 1 = 33 pairs
     if (vectors == NULL) {
         vectors = (float **) malloc(sizeof(float *) * 2);
         if (vectors == NULL) {
             exit(1);
         }
-        for (j = 0; j < 2; j++) {
-            vectors[j] = (float *) malloc(sizeof(float) * size + 1);
+        vectors[0] = (float *) malloc(sizeof(float) * size + 1);
+        vectors[1] = (float *) malloc(sizeof(float) * size + 1);
+        if (vectors[0] == NULL || vectors[1] == NULL) {
+            exit(1);
         }
     }
     for (i = 0; i < size; i++) {
-        vectors[0][i] = sin(rad(lower + (step * i)));
-        vectors[1][i] = cos(rad(lower + (step * i)));
+        j = lower + (step * i);
+        vectors[0][i] = sin(rad(j));
+        vectors[1][i] = cos(rad(j));
     }
     return vectors;
 }
@@ -285,6 +291,7 @@ float ** generateVectors(int8_t lower, int8_t higher, uint8_t step) {
 void renderShooter(shooter_t shooter) {
     point_t center;
     point_t shooter_pos;
+    uint8_t angle_index;
     shooter_pos.x = shooter.x;
     shooter_pos.y = shooter.y;
     if (shooter.flags & SHAKE) {
@@ -293,9 +300,12 @@ void renderShooter(shooter_t shooter) {
     }
     center.x = shooter.x + (TILE_WIDTH >> 1);
     center.y = shooter.y + (TILE_HEIGHT >> 1);
-    gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]], 255 - (((timer_1_Counter>>2)&15)<<2));
+    gfx_palette[shooter.pal_index] = gfx_Lighten(bubble_colors[shooter.next_bubbles[0]], 255 - (((timer_1_Counter>>2)&0x7F)<<2));
     gfx_SetColor(shooter.pal_index);
-    gfx_Line(center.x,center.y,center.x + TILE_WIDTH1_5 * shooter.vectors[0][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)],center.y - TILE_HEIGHT1_5 * shooter.vectors[1][getRangeIndex(shooter.angle,LBOUND,SHOOTER_STEP)]);
+    angle_index = getRangeIndex(shooter.angle, LBOUND, SHOOTER_STEP);
+    gfx_Line(center.x,center.y,
+        center.x + TILE_WIDTH1_5 * shooter.vectors[0][angle_index],
+        center.y - TILE_HEIGHT1_5 * shooter.vectors[1][angle_index]);
     //gfx_palette[shooter->pal_index] = bubble_colors[shooter->next_bubbles[0]];
     gfx_TransparentSprite(bubble_sprites[shooter.next_bubbles[0]],shooter_pos.x, shooter_pos.y);
     gfx_SetColor((sizeof_bubble_pal>>1)+shooter.next_bubbles[1]);
@@ -312,14 +322,18 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
 }
 void moveProj(grid_t grid, shooter_t * shooter, float dt) {
     uint8_t i;
+    uint8_t angle_index;
     point_t coord,proj_coord; //x,y not col/row
     projectile_t * projectile = &shooter->projectile;
     /*gfx_SetColor(1);
     gfx_Rectangle(40,40,40,40);
     gfx_BlitBuffer();
     while(kb_Data[1] & kb_2nd) kb_Scan();*/
-    projectile->x += dt * projectile->speed * shooter->vectors[0][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
-    projectile->y -= dt * projectile->speed * shooter->vectors[1][getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP)];
+    projectile->prev_x = projectile->x;
+    projectile->prev_y = projectile->y;
+    angle_index = getRangeIndex(projectile->angle,LBOUND,SHOOTER_STEP);
+    projectile->x += dt * projectile->speed * shooter->vectors[0][angle_index];
+    projectile->y -= dt * projectile->speed * shooter->vectors[1][angle_index];
 
     proj_coord.x =  projectile->x - grid.x;
     proj_coord.y =  projectile->y - grid.y;
@@ -352,6 +366,24 @@ void moveProj(grid_t grid, shooter_t * shooter, float dt) {
             shooter->flags &= ~ACTIVE_PROJ;
             return;
         }
+    }
+}
+
+void drawTrajectoryPreview(grid_t grid, shooter_t shooter, float dt) {
+    int x, y;
+    int angle_index;
+    angle_index = getRangeIndex(shooter.angle, LBOUND, SHOOTER_STEP);
+    x = shooter.x + (TILE_WIDTH >> 1);
+    y = shooter.y + (TILE_HEIGHT >> 1);
+    gfx_SetColor(shooter.pal_index);
+    for (int i = 0; i < 100; i++) {
+        x += dt * shooter.vectors[0][angle_index];
+        y -= dt * shooter.vectors[1][angle_index];
+        if (x <= grid.x || x >= grid.x + grid.width) {
+            angle_index = getRangeIndex(-shooter.angle, LBOUND, SHOOTER_STEP);
+        }
+        if (y <= grid.y) break;
+        if (y >= grid.y + grid.height) break;
     }
 }
 
@@ -500,7 +532,7 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
             turn_counter++;
             if (!(turn_counter % shift_rate)) {
                 if (turn_counter <= push_down_time) {
-                    addNewRow(grid, available_colors, 9);
+                    game_flags |= SHIFT;
                 } else {
                     game_flags |= PUSHDOWN;
                 }

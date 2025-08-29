@@ -142,6 +142,7 @@ typedef struct point {
 
 typedef struct projectile {
     float x, y;
+    float prev_x, prev_y;
     uint8_t speed;
     int angle;
     uint8_t color;

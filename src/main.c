@@ -166,9 +166,12 @@ int main(void) {
                         option_selected = false;
                     }
                 } else {
-                    show_levels_not_implemented = !show_levels_not_implemented;
-                    gfx_palette[levels_not_implemented_color_index] = BLACK;
-                    generic_timer = 0;
+                    if (!show_levels_not_implemented) {
+                        gfx_palette[levels_not_implemented_color_index] = BLACK;
+                        bright = 255;
+                        generic_timer = 0;
+                        show_levels_not_implemented = true;
+                    }
                     option_selected = false;
                 }
             }
@@ -184,25 +187,33 @@ int main(void) {
                 gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
             }
             gfx_PrintStringXY(">", 80, 100 + option * 24);
-        }
-        if (show_levels_not_implemented) {
-            gfx_SetTextScale(1, 1);
-            gfx_SetTextFGColor((sizeof_bubble_pal >> 1) + 7);
-            gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
-            if (single_press(kb_2nd_press, kb_2nd_prev)) {
-                show_levels_not_implemented = false;
-            }
-            if (generic_timer++ > 30) {
-                gfx_SetTextFGColor(levels_not_implemented_color_index);
-                bright = 255 - (generic_timer - 30) * 5;
-                gfx_palette[levels_not_implemented_color_index] = gfx_Lighten(gfx_palette[levels_not_implemented_color_index], bright);
-                if (bright <= 0) {
+            if (show_levels_not_implemented) {
+                if (single_press(kb_2nd_press, kb_2nd_prev)) {
+                    bright = 0;
+                    generic_timer = 40;
                     gfx_palette[levels_not_implemented_color_index] = BLACK;
                     show_levels_not_implemented = false;
-                    generic_timer = 0;
+                } else {
+                    if (generic_timer++ > 30) {
+                        gfx_SetTextFGColor(levels_not_implemented_color_index);
+                        if (bright > 0) {
+                            bright -= 5;
+                            gfx_palette[levels_not_implemented_color_index] = gfx_Lighten(gfx_palette[levels_not_implemented_color_index], bright);
+                        }
+                    }
+                    if (bright) {
+                        gfx_SetTextScale(1, 1);
+                        gfx_SetTextFGColor((sizeof_bubble_pal >> 1) + 7);
+                        gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
+                    } else {
+                        generic_timer = 0;
+                        show_levels_not_implemented = false;
+                    }
                 }
             }
-        }   
+        }
+        
+        
         if (quit) {
             break;
         }

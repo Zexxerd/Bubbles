@@ -49,6 +49,20 @@ extern unsigned int player_score;
 extern unsigned int turn_counter;
 extern unsigned int push_down_time;
 
+
+//Game-mode specific variables
+extern enum game_mode current_game;
+extern bool quit;
+extern char win_string[];
+extern char lose_string[];
+extern char option_strings[4][18];
+
+//Survival mode
+uint8_t auto_shift_counter; //counts automatic shifts in survival mode
+
+
+
+
 #ifdef DEBUG
 extern bool debug_flag;
 #endif
@@ -66,12 +80,6 @@ extern bool fall_started;
 extern falling_bubble_list_t fall_data;
 extern int fall_total;
 extern uint8_t fall_counter;
-
-extern enum game_mode current_game;
-extern bool quit;
-extern char win_string[];
-extern char lose_string[];
-extern char option_strings[4][18];
 
 extern bool kb_2nd_press, kb_2nd_prev;
 extern bool kb_clear_press, kb_clear_prev;
@@ -565,20 +573,38 @@ void game(void) {
             pushDown(&grid);
             game_flags &= ~PUSHDOWN;
         }
-        if (game_flags & CHECK) {
+        if (game_flags & CHECK) { // Check for game over after popping bubbles
             grid.possible_collisions = getPossibleCollisions(grid);
             if (grid.possible_collisions.size == 0) {
                 switch (current_game) {
                     case SURVIVAL: //goal: add a 40000pt bonus for clearing the board
                         player_score += 40000;
-                        shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
+                        auto_shift_counter = 8;
+                        setAvailableColors(available_colors, (1 << (max_color + 1)) - 1);
+                         // force a grid shift
+                        //addNewRow(&grid, grid.available_colors, );
+                        //shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
                         break;
                     default:
                         break;
                 }
             }
+            if (current_game == SURVIVAL) {
+                if (max_color < MAX_POSSIBLE_COLOR && turn_counter && !(turn_counter % 50)) {
+                    available_colors[++available_colors[0]] = ++max_color;
+                }
+            }
             game_flags &= ~CHECK;
         }
+        if (game_flags & NEW_ROW) {
+            addNewRow(grid, available_colors, 9);
+            game_flags &= ~NEW_ROW;
+        }
+        if (current_game == SURVIVAL && auto_shift_counter) {
+            auto_shift_counter--;
+            game_flags |= NEW_ROW;
+        }
+        
         //Move the projectile
         
         if (draw_behind_proj_sprite) {
