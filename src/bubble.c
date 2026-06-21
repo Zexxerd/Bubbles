@@ -317,8 +317,8 @@ bool collide(float x1,float y1,float x2,float y2,uint8_t r) {
     float dx,dy,dist;
     dx = x2 - x1;
     dy = y2 - y1;
-    dist = sqrt((dx * dx) + (dy * dy));
-    return (dist < r);
+    dist = (dx * dx) + (dy * dy);
+    return (dist < (float)r*r);
 }
 void moveProj(grid_t grid, shooter_t * shooter, float dt) {
     uint8_t i;
@@ -414,11 +414,11 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
         gridpos.y = grid.rows - 1;
     }
     index = getRangeIndex(shooter->projectile.angle, LBOUND, SHOOTER_STEP);
-    back_coords = getGridPosition(round(shooter->projectile.x - shooter->projectile.speed * shooter->vectors[0][index] * dt),
-                                  round(shooter->projectile.y + shooter->projectile.speed * shooter->vectors[1][index] * dt));
+    back_coords = getGridPosition(shooter->projectile.prev_x + (TILE_WIDTH>>1) - grid.x,
+                                  shooter->projectile.prev_y + (TILE_HEIGHT>>1) - grid.y);
     for (i = gridpos.y; i < grid.rows; i++) {
-        gfx_SetColor(1);
 #ifdef DEBUG
+        gfx_SetColor(1);
         debug_coords = getTileCoordinate(gridpos.x, i);
         debug_coords.x += grid.x;
         debug_coords.y += grid.y;
@@ -437,8 +437,8 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
             break;
         } else {
             if (back_coords.y >= grid.rows) break;
-            gfx_SetColor(29);
 #ifdef DEBUG
+            gfx_SetColor(29);
             debug_coords = getTileCoordinate(back_coords.y, back_coords.x);
             gfx_FillRectangle(debug_coords.x, debug_coords.y, TILE_WIDTH, TILE_HEIGHT);
 #endif

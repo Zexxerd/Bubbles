@@ -596,10 +596,6 @@ void game(void) {
             }
             game_flags &= ~CHECK;
         }
-        if (game_flags & NEW_ROW) {
-            addNewRow(grid, available_colors, 9);
-            game_flags &= ~NEW_ROW;
-        }
         if (current_game == SURVIVAL && auto_shift_counter) {
             auto_shift_counter--;
             game_flags |= NEW_ROW;
@@ -616,6 +612,11 @@ void game(void) {
             moveProj(grid, &shooter, fps_ratio * 2);
         }
         
+        if (game_flags & NEW_ROW) {
+            addNewRow(grid, available_colors, 9);
+            game_flags &= ~NEW_ROW;
+        }
+
         //Display
         if (!(game_flags & NEW_LEVEL) && (current_game == SURVIVAL)) {
             if (shooter.flags & SHAKE) {
