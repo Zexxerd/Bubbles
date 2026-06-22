@@ -36,3 +36,17 @@ Math and Apps change the color of the shooter.
 Prgm shows the available colors in the grid.
 
 Vars shows the bubbles that a projectile should be able to collide with.
+
+Reciprocal (x^-1) forces a row to appear.
+
+Sin decreases the new row rate.
+
+Cos increases the new row rate.
+
+Tan decreases the time until the grid starts moving down. (Unused in survival)
+
+Power (^) increases the time until the grid starts moving down. (Unused in survival)
+
+Square (x^2) toggles the shooter.
+
+Comma allows you to move the highlight vertically without moving the grid.
