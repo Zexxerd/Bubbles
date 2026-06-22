@@ -9,5 +9,14 @@ enum game_mode {
     CAMPAIGN = 3
 };
 
+enum game_result {
+    STOPPED = 0,
+    RUNNING = 1,
+    LOSE = 2,
+    WIN = 4,
+    NEXT_LEVEL = 8,
+    PAUSE = 16,
+    QUIT = 32
+};
 void game();
 #endif

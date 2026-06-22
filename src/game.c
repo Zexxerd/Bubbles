@@ -44,7 +44,7 @@ extern uint8_t max_color;
 extern uint8_t * available_colors;
 
 extern uint8_t game_flags; //global because our grid no longer holds it
-extern uint8_t shift_rate;
+extern uint8_t new_row_rate;
 extern unsigned int player_score;
 extern unsigned int turn_counter;
 extern unsigned int push_down_time;
@@ -52,13 +52,13 @@ extern unsigned int push_down_time;
 
 //Game-mode specific variables
 extern enum game_mode current_game;
-extern bool quit;
+extern enum game_result game_status;
 extern char win_string[];
 extern char lose_string[];
 extern char option_strings[4][18];
 
 //Survival mode
-uint8_t auto_shift_counter; //counts automatic shifts in survival mode
+uint8_t auto_new_row_counter; //counts automatic new row shifts in survival mode
 
 
 
@@ -138,7 +138,7 @@ void game(void) {
     bool draw_behind_proj_sprite;
     //grid settings
     max_color = 4; //max color index, 0 to max_color inclusive
-    shift_rate = 10;
+    new_row_rate = 10;
     if (current_game == SURVIVAL) {
         push_down_time = 16777215; //max int
     } else {
@@ -223,6 +223,7 @@ void game(void) {
     }
     draw_behind_proj_sprite = false;
     
+    game_status = RUNNING;
     lost = false;
     won = false;
     
@@ -246,7 +247,8 @@ void game(void) {
     /*
      Note: Peform graphics buffer-using logic before clearing screen
      */
-    while (!single_press(kb_clear_press, kb_clear_prev)) {
+    key = 255; //invalid
+    while (true) {
         kb_Scan();
         prevkey = key;
         key = kb_AnyKey();
@@ -390,7 +392,9 @@ void game(void) {
                 shooter.counter = (uint8_t) fps / 3; //shake for 1/3 second
             }
         }
-        
+        if (single_press(kb_clear_press, kb_clear_prev)) {
+            game_status = QUIT;
+        }
 #ifdef DEBUG
         /*Debug: Show neighbors*/
         if (kb_Data[2] & kb_Alpha) {
@@ -513,10 +517,10 @@ void game(void) {
         }
         /*Debug: Shift Rate*/
         if (kb_Data[3] & kb_Sin) {
-            shift_rate--;
+            new_row_rate--;
         }
         if (kb_Data[4] & kb_Cos) {
-            shift_rate++;
+            new_row_rate++;
         }
         if (kb_Data[5] & kb_Tan) {
             push_down_time--;
@@ -591,10 +595,11 @@ void game(void) {
                 if (!(grid.bubbles[grid.cols * (grid.rows - 1) + i].flags & EMPTY)) {
                     if (current_game == SURVIVAL && grid.rows < 17) {
                         grid.rows++;
-                        grid.y -= TILE_HEIGHT;
+                        grid.y -= ROW_HEIGHT;
+                        grid.height += ROW_HEIGHT;
                         game_flags |= RENDER;
                     } else {
-                        lost = true;
+                        game_status = LOSE;
                     }
                 }
             }
@@ -621,12 +626,12 @@ void game(void) {
                 switch (current_game) {
                     case SURVIVAL: //goal: add a 40000pt bonus message for clearing the board
                         player_score += 40000;
-                        auto_shift_counter = 8;
+                        auto_new_row_counter = 8;
                         shooter.flags &= ~DEACTIVATED;
                         setAvailableColors(available_colors, (1 << (max_color + 1)) - 1);
                          // force a grid shift
-                        //addNewRow(&grid, grid.available_colors, 1);
-                        shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
+                        //addNewRow(&grid, grid.available_colors, 9);
+                        new_row_rate = (new_row_rate > 3) ? new_row_rate - 1 : 3;
                         break;
                     default:
                         break;
@@ -639,9 +644,9 @@ void game(void) {
             }
             game_flags &= ~CHECK;
         }
-        if (current_game == SURVIVAL && auto_shift_counter) {
-            auto_shift_counter--;
-            if (!auto_shift_counter) {
+        if (current_game == SURVIVAL && auto_new_row_counter) {
+            auto_new_row_counter--;
+            if (!auto_new_row_counter) {
                 shooter.flags &= ~DEACTIVATED;
                 grid.possible_collisions = getPossibleCollisions(grid);
             }
@@ -733,8 +738,8 @@ void game(void) {
             }
             gfx_PrintStringXY("Turn:",0,24);
             gfx_PrintUIntXY(turn_counter,3,48,24);
-            gfx_PrintStringXY("Shift rate:",0,32);
-            gfx_PrintUIntXY(shift_rate,3,74,32);
+            gfx_PrintStringXY("NR rate:",0,32);
+            gfx_PrintUIntXY(new_row_rate,3,74,32);
             gfx_PrintStringXY("Push time:",0,40);
             if (push_down_time == 16777215) {
                 gfx_PrintStringXY("Max", 74, 40);
@@ -764,8 +769,8 @@ void game(void) {
             if (game_flags & RENDER) {
                 gfx_PrintStringXY("game:RENDER",0,56);
             }
-            if (game_flags & SHIFT) {
-                gfx_PrintStringXY("game:SHIFT",0,64);
+            if (game_flags & NEW_ROW) {
+                gfx_PrintStringXY("game:NEWROW",0,64);
             }
             if (game_flags & POP) {
                 gfx_PrintStringXY("game:POP",0,72);
@@ -798,12 +803,13 @@ void game(void) {
         }
         gfx_SetTextFGColor(0);
         gfx_BlitBuffer();
-        if (lost || won) break;
+        if (game_status == QUIT) break;
+        if (game_status == LOSE || game_status == WIN) break;
     }
     //End of game animation
-    if (lost | won) {
+    if (game_status != QUIT) {
         //init partial redraw
-        end_of_game_string = lost ? lose_string : win_string;
+        end_of_game_string = game_status == LOSE ? lose_string : win_string;
         k = 1;
         i = gfx_GetStringWidth(end_of_game_string);
         lose_animation_behind = gfx_MallocSprite(i,8);

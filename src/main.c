@@ -36,7 +36,7 @@
 extern const uint16_t bubble_colors[7];
 
 enum game_mode current_game;
-bool lost, won;
+enum game_result game_status;
 bool quit;
 
 char lose_string[] = "You Lose!";
@@ -59,6 +59,8 @@ int main(void) {
     //int i,j,k;
     //point_t point;
     uint16_t saved_palette[256];
+
+    game_status = STOPPED;
 
     option_lengths[0] = gfx_GetStringWidth(option_strings[0]);
     option_lengths[1] = gfx_GetStringWidth(option_strings[1]);
@@ -142,7 +144,7 @@ int main(void) {
                     dark += 5;
                 }*/
             } else {
-                if (option == 0) { // no options rn
+                if (option == SURVIVAL) { // no options rn
                     if (gfx_pal_modified) {
                         memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                         gfx_pal_modified = false;
@@ -164,6 +166,30 @@ int main(void) {
                         gfx_pal_modified = false;
                         //while(!os_GetCSC());
                         game();
+                        if (game_status != QUIT) {
+                                gfx_pal_modified = true;
+                                memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
+
+                            if (game_status == LOSE) {
+                                dark = 255;
+                                while (dark > 0) {
+                                    dark -= 5;
+                                    for (int i = 0; i < 256; i++) {
+                                        gfx_palette[i] = gfx_Darken(saved_palette[i], dark);
+                                    }
+                                }
+                            } else if (game_status == WIN) {
+                                bright = 255;
+                                gfx_pal_modified = true;
+                                memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
+                                while (bright > 0) {
+                                    bright -= 5;
+                                    for (int i = 0; i < 256; i++) {
+                                        gfx_palette[i] = gfx_Lighten(saved_palette[i], bright);
+                                    }
+                                }
+                            }
+                        }
                         option_selected = false;
                     }
                 } else {
@@ -203,7 +229,7 @@ int main(void) {
                         }
                     }
                     gfx_SetTextScale(1, 1);
-                    gfx_SetTextFGColor((sizeof_bubble_pal >> 1) + 7);
+                    gfx_SetTextFGColor(levels_not_implemented_color_index);
                     gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
                     if (!bright) {
                         generic_timer = 0;
@@ -212,12 +238,39 @@ int main(void) {
                 }
             }
         }
-        
-        
+        gfx_BlitBuffer();
+        if (game_status == LOSE) {
+            dark = 0;
+            gfx_pal_modified = true;
+            gfx_SetTextFGColor(0);
+            while (dark < 255) {
+                dark += 10;
+                if (dark > 255) {
+                    dark = 255;
+                }
+                for (int i = 0; i < 256; i++) {
+                    gfx_palette[i] = gfx_Darken(saved_palette[i], dark);
+                }
+            }
+            game_status = STOPPED;
+        } else if (game_status == WIN) {
+            bright = 0;
+            gfx_pal_modified = true;
+            gfx_SetTextFGColor(0);
+            while (bright < 255) {
+                bright += 10;
+                if (bright > 255) {
+                    bright = 255;
+                }
+                for (int i = 0; i < 256; i++) {
+                    gfx_palette[i] = gfx_Lighten(saved_palette[i], bright);
+                }
+            }
+            game_status = STOPPED;
+        }
         if (quit) {
             break;
         }
-        gfx_BlitBuffer();
     }
     gfx_End();
 }

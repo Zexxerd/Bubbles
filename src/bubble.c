@@ -18,7 +18,7 @@ uint8_t max_color;
 unsigned int player_score;
 unsigned int turn_counter;
 unsigned int push_down_time;
-uint8_t shift_rate;
+uint8_t new_row_rate;
 uint8_t * available_colors;
 
 #ifdef DEBUG
@@ -531,7 +531,7 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
             }
         } else {
             turn_counter++;
-            if (!(turn_counter % shift_rate)) {
+            if (!(turn_counter % new_row_rate)) {
                 if (turn_counter <= push_down_time) {
                     game_flags |= SHIFT;
                 } else {
