@@ -83,6 +83,8 @@ extern uint8_t fall_counter;
 
 extern bool kb_2nd_press, kb_2nd_prev;
 extern bool kb_clear_press, kb_clear_prev;
+extern bool kb_up_press, kb_up_prev;
+extern bool kb_down_press, kb_down_prev;
 
 void game(void) {
     int i,j,k; //universal counter
@@ -104,6 +106,7 @@ void game(void) {
     bubble_t debug_bubble;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
+    bool move_bubble_grid;
     //debugTestOutput();
     //debugTestRead();
     //exit(1);
@@ -230,6 +233,7 @@ void game(void) {
 #ifdef DEBUG
     x = y = 0;
     highlight_timer = 0;
+    move_bubble_grid = false;
 #endif
     gfx_FillScreen(255);
     /*Initialize timer*/ 
@@ -250,6 +254,10 @@ void game(void) {
         kb_2nd_press = kb_Data[1] & kb_2nd;
         kb_clear_prev = kb_clear_press;
         kb_clear_press = kb_Data[6] & kb_Clear;
+        kb_up_prev = kb_up_press;
+        kb_up_press = kb_Data[7] & kb_Up;
+        kb_down_prev = kb_down_press;
+        kb_down_press = kb_Data[7] & kb_Down;
         if (game_flags & RENDER) {
             renderGrid(grid, grid_buffer);
             game_flags &= ~RENDER;
@@ -320,8 +328,31 @@ void game(void) {
                 //shooter.flags |= REDRAW_SHOOTER;
             }
         }
+        #ifdef DEBUG //in debug mode, we want to disable moving the grid when comma is pressed
+        if (move_bubble_grid) {
+        #endif
+        if (single_press(kb_up_press, kb_up_prev)) { //TODO: Define max rows based on mode
+            if (grid.rows < 17) {
+                grid.rows++;
+                grid.y -= ROW_HEIGHT;
+                grid.height += ROW_HEIGHT;
+                game_flags |= RENDER;
+            }
+            
+        }
+        if (single_press(kb_down_press, kb_down_prev)) {
+            if (grid.rows > 5) {
+                grid.rows--;
+                grid.y += ROW_HEIGHT;
+                grid.height -= ROW_HEIGHT;
+                game_flags |= RENDER;
+            }
+        }
+        #ifdef DEBUG
+        }
+        #endif
 #ifdef DEBUG
-        if (kb_Data[7] & kb_Up)
+        if (kb_Data[7] & kb_Up && kb_Data[7])
             y -= (y > 0);
         if (kb_Data[7] & kb_Down)
             y += (y < grid.rows - 1);
@@ -497,6 +528,11 @@ void game(void) {
         if (kb_Data[2] & kb_Square) {
             shooter.flags ^= DEACTIVATED;
         }
+        if (kb_Data[3] & kb_Comma) {
+            move_bubble_grid = false;
+        } else {
+            move_bubble_grid = true;
+        }
 #endif //DEBUG
         if (game_flags & POP) {
             if (!pop_started) {
@@ -553,7 +589,13 @@ void game(void) {
         if (game_flags & CHECK) {
             for (i = 0;i < grid.cols; i++) {
                 if (!(grid.bubbles[grid.cols * (grid.rows - 1) + i].flags & EMPTY)) {
-                    lost = true;
+                    if (current_game == SURVIVAL && grid.rows < 17) {
+                        grid.rows++;
+                        grid.y -= TILE_HEIGHT;
+                        game_flags |= RENDER;
+                    } else {
+                        lost = true;
+                    }
                 }
             }
             j = 0;
@@ -577,13 +619,14 @@ void game(void) {
             grid.possible_collisions = getPossibleCollisions(grid);
             if (grid.possible_collisions.size == 0) {
                 switch (current_game) {
-                    case SURVIVAL: //goal: add a 40000pt bonus for clearing the board
+                    case SURVIVAL: //goal: add a 40000pt bonus message for clearing the board
                         player_score += 40000;
                         auto_shift_counter = 8;
+                        shooter.flags &= ~DEACTIVATED;
                         setAvailableColors(available_colors, (1 << (max_color + 1)) - 1);
                          // force a grid shift
-                        //addNewRow(&grid, grid.available_colors, );
-                        //shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
+                        //addNewRow(&grid, grid.available_colors, 1);
+                        shift_rate = (shift_rate > 3) ? shift_rate - 1 : 3;
                         break;
                     default:
                         break;
@@ -598,7 +641,11 @@ void game(void) {
         }
         if (current_game == SURVIVAL && auto_shift_counter) {
             auto_shift_counter--;
-            game_flags |= NEW_ROW;
+            if (!auto_shift_counter) {
+                shooter.flags &= ~DEACTIVATED;
+                grid.possible_collisions = getPossibleCollisions(grid);
+            }
+            game_flags |= NEW_ROW | RENDER;
         }
         
         //Move the projectile

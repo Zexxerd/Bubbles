@@ -51,8 +51,9 @@ char option_strings[4][18] = {
 int option_lengths[4];
 
 bool kb_2nd_press, kb_2nd_prev; 
-bool kb_clear_press, kb_clear_prev; 
-
+bool kb_clear_press, kb_clear_prev;
+bool kb_up_press, kb_up_prev;
+bool kb_down_press, kb_down_prev;
 
 int main(void) {
     //int i,j,k;
@@ -201,11 +202,10 @@ int main(void) {
                             gfx_palette[levels_not_implemented_color_index] = gfx_Lighten(gfx_palette[levels_not_implemented_color_index], bright);
                         }
                     }
-                    if (bright) {
-                        gfx_SetTextScale(1, 1);
-                        gfx_SetTextFGColor((sizeof_bubble_pal >> 1) + 7);
-                        gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
-                    } else {
+                    gfx_SetTextScale(1, 1);
+                    gfx_SetTextFGColor((sizeof_bubble_pal >> 1) + 7);
+                    gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
+                    if (!bright) {
                         generic_timer = 0;
                         show_levels_not_implemented = false;
                     }

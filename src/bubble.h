@@ -179,7 +179,7 @@ float ** generateVectors(int8_t lower,int8_t higher,uint8_t step);
 void renderShooter(shooter_t shooter);
 bool collide(float x1,float y1,float x2,float y2,uint8_t r);
 void moveProj(grid_t grid,shooter_t * shooter,float dt);
-void snapBubble(shooter_t * shooter,grid_t grid, float dt);
+void snapBubble(shooter_t * shooter,grid_t grid);
 void resetProcessed(grid_t grid);
 bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool add_empty);
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);

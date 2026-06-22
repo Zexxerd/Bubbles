@@ -348,7 +348,7 @@ void moveProj(grid_t grid, shooter_t * shooter, float dt) {
     }
     if (proj_coord.y <= 0) {
         projectile->y = grid.y;
-        snapBubble(shooter, grid, dt);
+        snapBubble(shooter, grid);
         shooter->flags &= ~ACTIVE_PROJ;
         return;
     }
@@ -362,7 +362,7 @@ void moveProj(grid_t grid, shooter_t * shooter, float dt) {
                     coord.x + (TILE_WIDTH>>1),
                     coord.y + (TILE_HEIGHT>>1),
                     grid.ball_diameter)) {
-            snapBubble(shooter, grid, dt);
+            snapBubble(shooter, grid);
             shooter->flags &= ~ACTIVE_PROJ;
             return;
         }
@@ -387,7 +387,7 @@ void drawTrajectoryPreview(grid_t grid, shooter_t shooter, float dt) {
     }
 }
 
-void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
+void snapBubble(shooter_t * shooter, grid_t grid) {
     bool addtile;
     uint8_t i,j;
     uint8_t index; //uint8_t or int
@@ -414,6 +414,7 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
         gridpos.y = grid.rows - 1;
     }
     index = getRangeIndex(shooter->projectile.angle, LBOUND, SHOOTER_STEP);
+    //TODO: add more checkpoints to increase accuracy
     back_coords = getGridPosition(shooter->projectile.prev_x + (TILE_WIDTH>>1) - grid.x,
                                   shooter->projectile.prev_y + (TILE_HEIGHT>>1) - grid.y);
     for (i = gridpos.y; i < grid.rows; i++) {
@@ -544,7 +545,7 @@ void snapBubble(shooter_t * shooter, grid_t grid, float dt) {
 }
 void resetProcessed(grid_t grid) {
     int i;
-    for (i = 0;i < (grid.rows * grid.cols);i++) {
+    for (i = 0; i < (grid.rows * grid.cols); i++) {
         grid.bubbles[i].flags &= ~(PROCESSED);
     }
 }
