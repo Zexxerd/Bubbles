@@ -648,7 +648,6 @@ void game(void) {
             auto_new_row_counter--;
             if (!auto_new_row_counter) {
                 shooter.flags &= ~DEACTIVATED;
-                grid.possible_collisions = getPossibleCollisions(grid);
             }
             game_flags |= NEW_ROW | RENDER;
         }
@@ -666,6 +665,9 @@ void game(void) {
         
         if (game_flags & NEW_ROW) {
             addNewRow(grid, available_colors, 9);
+            if (current_game == SURVIVAL && !auto_new_row_counter) {
+                grid.possible_collisions = getPossibleCollisions(grid);
+            }
             game_flags &= ~NEW_ROW;
         }
 
