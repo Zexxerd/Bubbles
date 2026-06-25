@@ -769,7 +769,7 @@ void game(void) {
             if (push_down_time == 16777215) {
                 gfx_PrintStringXY("Max", 74, 40);
             } else if (push_down_time == 0) {
-                gfx_PrintStringXY("zd", 74, 40);
+                gfx_PrintStringXY("NW", 74, 40);
             } else {
                 gfx_PrintIntXY(push_down_time,3,74,40);
             }
@@ -778,11 +778,12 @@ void game(void) {
             gfx_PrintInt(player_score,5);
             gfx_PrintStringXY("Angle:", 0, 56);
             gfx_PrintIntXY(shooter.angle, 3, 74, 56);
+            #ifdef DEBUG
             gfx_PrintStringXY("Rows:", 240, 0);
             gfx_PrintIntXY(grid.rows, 3, 280, 0);
             gfx_PrintStringXY("Cols:", 240, 8);
             gfx_PrintIntXY(grid.cols, 3, 280, 8);
-
+            #endif
 #ifdef DEBUG
             /*Draw a highlight for the highlighted square*/
             if ((highlight_timer-1) & 1) {
