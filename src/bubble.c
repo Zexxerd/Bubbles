@@ -711,3 +711,11 @@ bubble_list_t getPossibleCollisions(grid_t grid) {
     }
     return possible_collisions;
 }
+bool rowHasBubbles(grid_t grid, const uint8_t row) {
+    for (uint8_t i = grid.cols * row; i < grid.cols * (row + 1); i++) {
+        if (!(grid.bubbles[i].flags & EMPTY)) {
+            return true;
+        }
+    }
+    return false;
+}

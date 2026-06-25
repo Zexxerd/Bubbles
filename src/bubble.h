@@ -64,7 +64,7 @@
 #define PUSHDOWN  (1<<4) // Level has run out of bubbles, or push interval has passed, go down
 #define NEW_LEVEL (1<<5) // New level
 #define CHECK     (1<<6) // Check if bubbles have overflowed
-
+#define AUTO_FILL (1<<7) // Bubbles are being put in automatically
 /*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) do { \
 gfx_SetTextXY(x,y);                         \
@@ -185,4 +185,5 @@ bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley,bool add_em
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved);
 int findFloatingClusters(grid_t grid);
 bubble_list_t getPossibleCollisions(grid_t grid);
+bool rowHasBubbles(grid_t grid, const uint8_t row);
 #endif // BUBBLE_H

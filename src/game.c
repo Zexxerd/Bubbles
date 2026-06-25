@@ -30,7 +30,12 @@
 #ifndef TILE_HEIGHT
 #define TILE_HEIGHT 16
 #endif
-
+#ifndef MAX_ROWS
+#define MAX_ROWS 17
+#endif
+#ifndef MIN_ROWS
+#define MIN_ROWS 5
+#endif
 static char * printfloat(float elapsed) {
     real_t elapsed_real;
     static char str[10];
@@ -176,7 +181,7 @@ void game(void) {
     shooter.counter = 0;
     //grid
     grid.cols = 7;
-    grid.rows = 17; //16 + deadzone
+    grid.rows = MAX_ROWS; //16 + deadzone
     grid.x = centerX(((TILE_WIDTH * grid.cols) + (TILE_WIDTH >> 1)), LCD_WIDTH);
     grid.y = 0;
     grid.ball_diameter = TILE_WIDTH;
@@ -305,6 +310,8 @@ void game(void) {
             } else {
                 if (grid.rows < 10) {
                     grid.rows++;
+                    grid.y -= ROW_HEIGHT;
+                    grid.height += ROW_HEIGHT;
                 } else {
                     shooter.flags &= ~DEACTIVATED;
                     game_flags &= ~NEW_LEVEL;
@@ -334,20 +341,25 @@ void game(void) {
         if (move_bubble_grid) {
         #endif
         if (single_press(kb_up_press, kb_up_prev)) { //TODO: Define max rows based on mode
-            if (grid.rows < 17) {
-                grid.rows++;
-                grid.y -= ROW_HEIGHT;
-                grid.height += ROW_HEIGHT;
-                game_flags |= RENDER;
+            if (!(shooter.flags & ACTIVE_PROJ)) {
+                if (grid.rows < MAX_ROWS) {
+                        grid.rows++;
+                        grid.y -= ROW_HEIGHT;
+                        grid.height += ROW_HEIGHT;
+                        game_flags |= RENDER;
+                }
             }
-            
         }
         if (single_press(kb_down_press, kb_down_prev)) {
-            if (grid.rows > 5) {
-                grid.rows--;
-                grid.y += ROW_HEIGHT;
-                grid.height -= ROW_HEIGHT;
-                game_flags |= RENDER;
+            if (!(shooter.flags & ACTIVE_PROJ)) {
+                if (grid.rows > MIN_ROWS) {
+                    if (!rowHasBubbles(grid, grid.rows - 2)) {
+                        grid.rows--;
+                        grid.y += ROW_HEIGHT;
+                        grid.height -= ROW_HEIGHT;
+                        game_flags |= RENDER;
+                    }
+                }
             }
         }
         #ifdef DEBUG
@@ -591,9 +603,9 @@ void game(void) {
             }
         }
         if (game_flags & CHECK) {
-            for (i = 0;i < grid.cols; i++) {
-                if (!(grid.bubbles[grid.cols * (grid.rows - 1) + i].flags & EMPTY)) {
-                    if (current_game == SURVIVAL && grid.rows < 17) {
+            if (rowHasBubbles(grid, grid.rows - 1)) {
+                if (current_game == SURVIVAL) {
+                    if (grid.rows < MAX_ROWS) {
                         grid.rows++;
                         grid.y -= ROW_HEIGHT;
                         grid.height += ROW_HEIGHT;
@@ -606,14 +618,15 @@ void game(void) {
             j = 0;
             for (i = 0; i < grid.cols * grid.rows; i++) {
                 if (!(grid.bubbles[grid.cols * (grid.rows - 1) + i].flags & EMPTY)) {
-                    j = 1;
+                    j = 1; //Grid is not empty
                     break;
                 }
             }
             if (!j) {
-                game_flags |= NEW_LEVEL;
+                dbg_printf("New level!");
                 if (current_game == LEVELS)
-                    won = true;
+                    game_flags |= NEW_LEVEL;
+                    game_status = NEXT_LEVEL;
             }
         }
         if (game_flags & PUSHDOWN) {
@@ -627,7 +640,7 @@ void game(void) {
                     case SURVIVAL: //goal: add a 40000pt bonus message for clearing the board
                         player_score += 40000;
                         auto_new_row_counter = 8;
-                        shooter.flags &= ~DEACTIVATED;
+                        game_flags |= AUTO_FILL;
                         setAvailableColors(available_colors, (1 << (max_color + 1)) - 1);
                          // force a grid shift
                         //addNewRow(&grid, grid.available_colors, 9);
@@ -638,7 +651,7 @@ void game(void) {
                 }
             }
             if (current_game == SURVIVAL) {
-                if (max_color < MAX_POSSIBLE_COLOR && turn_counter && !(turn_counter % 50)) {
+                if (max_color < MAX_POSSIBLE_COLOR && turn_counter && (turn_counter % 25)) {
                     available_colors[++available_colors[0]] = ++max_color;
                 }
             }
@@ -668,6 +681,16 @@ void game(void) {
             if (current_game == SURVIVAL && !auto_new_row_counter) {
                 grid.possible_collisions = getPossibleCollisions(grid);
             }
+            if (game_flags & AUTO_FILL) {
+                if (rowHasBubbles(grid, grid.rows - 1)) { //
+                    grid.rows++;
+                    grid.y -= ROW_HEIGHT;
+                    grid.height += ROW_HEIGHT;
+                }
+                if (!auto_new_row_counter) {
+                    game_flags &= ~AUTO_FILL;
+                }
+            }
             game_flags &= ~NEW_ROW;
         }
 
@@ -685,9 +708,9 @@ void game(void) {
                 shooter.shake_values = 0;
             }
             renderShooter(shooter);
-            gfx_TransparentSprite(grid_buffer,grid.x,grid.y);
+            gfx_TransparentSprite(grid_buffer, grid.x, grid.y);
             gfx_SetColor(0);
-            gfx_Rectangle(grid.x,grid.y,grid.width,grid.height-ROW_HEIGHT);
+            gfx_Rectangle(grid.x, grid.y, grid.width, grid.height - ROW_HEIGHT);
             
             if (shooter.projectile.visible) {
                 /*
@@ -740,7 +763,7 @@ void game(void) {
             }
             gfx_PrintStringXY("Turn:",0,24);
             gfx_PrintUIntXY(turn_counter,3,48,24);
-            gfx_PrintStringXY("NR rate:",0,32);
+            gfx_PrintStringXY("Row rate:",0,32);
             gfx_PrintUIntXY(new_row_rate,3,74,32);
             gfx_PrintStringXY("Push time:",0,40);
             if (push_down_time == 16777215) {
@@ -755,6 +778,11 @@ void game(void) {
             gfx_PrintInt(player_score,5);
             gfx_PrintStringXY("Angle:", 0, 56);
             gfx_PrintIntXY(shooter.angle, 3, 74, 56);
+            gfx_PrintStringXY("Rows:", 240, 0);
+            gfx_PrintIntXY(grid.rows, 3, 280, 0);
+            gfx_PrintStringXY("Cols:", 240, 8);
+            gfx_PrintIntXY(grid.cols, 3, 280, 8);
+
 #ifdef DEBUG
             /*Draw a highlight for the highlighted square*/
             if ((highlight_timer-1) & 1) {
@@ -769,25 +797,25 @@ void game(void) {
             gfx_PrintUIntXY(x,2,20,LCD_HEIGHT-24);
             gfx_PrintUIntXY(y,2,20,LCD_HEIGHT-16);
             if (game_flags & RENDER) {
-                gfx_PrintStringXY("game:RENDER",0,56);
+                gfx_PrintStringXY("game:RENDER",0,64);
             }
             if (game_flags & NEW_ROW) {
-                gfx_PrintStringXY("game:NEWROW",0,64);
+                gfx_PrintStringXY("game:NEWROW",0,72);
             }
             if (game_flags & POP) {
-                gfx_PrintStringXY("game:POP",0,72);
+                gfx_PrintStringXY("game:POP",0,80);
             }
             if (game_flags & FALL) {
-                gfx_PrintStringXY("game:FALL",0,80);
+                gfx_PrintStringXY("game:FALL",0,88);
             }
             if (game_flags & PUSHDOWN) {
-                gfx_PrintStringXY("game:PUSHDOWN",0,88);
+                gfx_PrintStringXY("game:PUSHDOWN",0,96);
             }
             if (game_flags & CHECK) {
-                gfx_PrintStringXY("game:CHECK",0,96);
+                gfx_PrintStringXY("game:CHECK",0,104);
             }
             if (shooter.projectile.visible == true) {
-                gfx_PrintStringXY("proj:VISIBLE",0,104);
+                gfx_PrintStringXY("proj:VISIBLE",0,112);
             }
 #endif //DEBUG
         }
