@@ -211,7 +211,7 @@ void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint
 }
 
 void addNewRow(grid_t grid,uint8_t * available_colors,uint8_t chance) {
-    uint8_t i,j;
+    uint8_t i,j,color;
     row_offset ^= 1;
     for (i = grid.rows-1;i;i--) {
         for (j = grid.cols;j;j--) {
@@ -221,10 +221,11 @@ void addNewRow(grid_t grid,uint8_t * available_colors,uint8_t chance) {
     }
     for (j = 0;j < grid.cols;j++) {
         if (available_colors) {
-            grid.bubbles[j] = newBubble(j,0,available_colors[randInt(1,available_colors[0])],(randInt(1,10) > chance) ? EMPTY : 0);
+            color = available_colors[randInt(1,available_colors[0])];
         } else {
-            grid.bubbles[j] = newBubble(j,0,randInt(0,max_color),(randInt(1,10) > chance) ? EMPTY : 0);
+            color = randInt(0,max_color);
         }
+        grid.bubbles[j] = newBubble(j,0, color,(randInt(1,10) > chance) ? EMPTY : 0);
     }
 }
 

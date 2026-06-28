@@ -375,18 +375,25 @@ void game(void) {
         if (kb_Data[1] & kb_2nd) {
             if (!(shooter.flags & DEACTIVATED)) {
                 if (!(shooter.flags & ACTIVE_PROJ)) {
-                    if (grid.possible_collisions.size || current_game != LEVELS) {
+                    if (grid.possible_collisions.size) {
                         shooter.projectile.x = shooter.x;
                         shooter.projectile.y = shooter.y;
                         shooter.projectile.speed = 5;
                         shooter.projectile.angle = shooter.angle;
                         shooter.projectile.color = shooter.next_bubbles[0];
-                        shooter.next_bubbles[0] = shooter.next_bubbles[1];
+                        for (i = 1; i < available_colors[0] + 1; i++) {
+                            if (available_colors[i] == shooter.next_bubbles[1]) {
+                                shooter.next_bubbles[0] = shooter.next_bubbles[1];
+                            }
+                        }
+                        if (i == available_colors[0] + 1) { //next bubble color not in grid
+                            shooter.next_bubbles[0] = randInt(1, available_colors[0]);
+                        }
                         shooter.next_bubbles[1] = shooter.next_bubbles[2];
                         getAvailableColors(grid, available_colors);
                         if (!available_colors[0]) {
-                            available_colors[0] = 1;
-                            available_colors[1] = 0;
+                            available_colors[0] = 1; //one color
+                            available_colors[1] = 0; //red
                         }
                         shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
                         shooter.projectile.visible = true;
@@ -503,6 +510,8 @@ void game(void) {
             gfx_FillScreen(255);
             gfx_PrintStringXY("Size: ",0,0);
             gfx_PrintUIntXY(available_colors[0],1,48,0);
+            gfx_PrintStringXY("Max color (inclusive):",0,8);
+            gfx_PrintUIntXY(max_color,1,176,8);
             for (j = 0;j < available_colors[0];j++) {
                 gfx_PrintUIntXY(available_colors[j+1],8,120,16+j*8);
             }
@@ -644,6 +653,7 @@ void game(void) {
                         setAvailableColors(available_colors, (1 << (max_color + 1)) - 1);
                          // force a grid shift
                         //addNewRow(&grid, grid.available_colors, 9);
+
                         new_row_rate = (new_row_rate > 3) ? new_row_rate - 1 : 3;
                         break;
                     default:
@@ -651,7 +661,7 @@ void game(void) {
                 }
             }
             if (current_game == SURVIVAL) {
-                if (max_color < MAX_POSSIBLE_COLOR && turn_counter && (turn_counter % 25)) {
+                if (max_color < MAX_POSSIBLE_COLOR && turn_counter && turn_counter % 25 == 0) {
                     available_colors[++available_colors[0]] = ++max_color;
                 }
             }
@@ -682,7 +692,7 @@ void game(void) {
                 grid.possible_collisions = getPossibleCollisions(grid);
             }
             if (game_flags & AUTO_FILL) {
-                if (rowHasBubbles(grid, grid.rows - 1)) { //
+                if (rowHasBubbles(grid, grid.rows - 1)) { //last row full, push upward
                     grid.rows++;
                     grid.y -= ROW_HEIGHT;
                     grid.height += ROW_HEIGHT;
