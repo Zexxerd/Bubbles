@@ -6,8 +6,6 @@
 #define centerx_image(screen_width, image_width) ((screen_width - image_width) >> 1)
 #define centery_image(screen_height, image_height) ((screen_height - image_height) >> 1)
 
-extern enum game_result;
-
 void fade_in(uint16_t * copy_palette, int * value, int step) {
     /**
      * Function that fades the screen in from black.

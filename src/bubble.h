@@ -57,8 +57,7 @@
 
 //grid
 #define RENDER    (1<<0) // redraw grid
-#define SHIFT     (1<<1) // the grid goes down one
-#define NEW_ROW   (1<<1) // ^^
+#define NEW_ROW   (1<<1) // the grid goes down one
 #define POP       (1<<2) // Bubbles are popping.
 #define FALL      (1<<3) // Falling bubbles, wear a helmet
 #define PUSHDOWN  (1<<4) // Level has run out of bubbles, or push interval has passed, go down

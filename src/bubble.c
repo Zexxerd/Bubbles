@@ -17,6 +17,7 @@ uint8_t row_offset; // 0: even row; 1: odd row
 uint8_t max_color;
 unsigned int player_score;
 unsigned int turn_counter;
+unsigned int global_counter;
 unsigned int push_down_time;
 uint8_t new_row_rate;
 uint8_t * available_colors;
@@ -188,7 +189,7 @@ point_t getGridPosition(int x, int y) {
     return temp;
 }
 
-void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint8_t * available_colors) {
+void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint8_t * g_colors) {
     /*example: initGrid(grid,16,7,15) for a 16*7 grid with the 15th and 16th rows empty*/
     uint8_t i,j,r;
 //  point_t p = {0, 0};//getGridPosition(grid->x,grid->y);
@@ -199,8 +200,8 @@ void initGrid(grid_t grid,uint8_t rows,uint8_t cols,uint8_t empty_row_start,uint
             if (i >= empty_row_start - 1) {
                 grid.bubbles[(i*cols)+j] = newBubble(j,i,0,EMPTY);
             } else {
-                if (available_colors) {
-                    r = available_colors[randInt(1,available_colors[0])];
+                if (g_colors) {
+                    r = g_colors[randInt(1,g_colors[0])];
                 } else {
                     r = randInt(0,max_color);
                 }
@@ -534,7 +535,7 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
             turn_counter++;
             if (!(turn_counter % new_row_rate)) {
                 if (turn_counter <= push_down_time) {
-                    game_flags |= SHIFT;
+                    game_flags |= NEW_ROW;
                 } else {
                     game_flags |= PUSHDOWN;
                 }
@@ -542,6 +543,7 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
         }
         free(cluster.bubbles);
     }
+    global_counter++;
     game_flags |= CHECK;
 }
 void resetProcessed(grid_t grid) {

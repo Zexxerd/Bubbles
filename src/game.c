@@ -52,6 +52,7 @@ extern uint8_t game_flags; //global because our grid no longer holds it
 extern uint8_t new_row_rate;
 extern unsigned int player_score;
 extern unsigned int turn_counter;
+extern unsigned int global_counter; //always increments, unlike turn counter
 extern unsigned int push_down_time;
 
 
@@ -142,7 +143,7 @@ void game(void) {
     
     bool draw_behind_proj_sprite;
     //grid settings
-    max_color = 4; //max color index, 0 to max_color inclusive
+    max_color = 3; //max color index, 0 to max_color inclusive
     new_row_rate = 10;
     if (current_game == SURVIVAL) {
         push_down_time = 16777215; //max int
@@ -150,6 +151,7 @@ void game(void) {
         push_down_time = 6;
     }
     turn_counter = 0;
+    global_counter = 0;
     player_score = 0;
     fps = last_fps = 30;
     fps_string = malloc(15 * sizeof(char));
@@ -197,7 +199,7 @@ void game(void) {
 
     srand(rtc_Time());
     available_colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR + 2) * sizeof(uint8_t));
-    setAvailableColors(available_colors, 0x7F);
+    setAvailableColors(available_colors, 0x7F); // all colors
     initGrid(grid,grid.rows,grid.cols, 10, NULL);
     grid.possible_collisions = getPossibleCollisions(grid);
     
@@ -231,11 +233,11 @@ void game(void) {
     game_status = RUNNING;
     lost = false;
     won = false;
-    
+
     strcpy(fps_string,"FPS: ");
     fps_counter = 0;
     row_offset = 0;
-    
+
 #ifdef DEBUG
     x = y = 0;
     highlight_timer = 0;
@@ -246,7 +248,7 @@ void game(void) {
     timer_Control = TIMER1_DISABLE;
     timer_1_Counter = 0;
     timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
-    
+
     /*Main game*/
     //Starting level
     /*
@@ -381,13 +383,16 @@ void game(void) {
                         shooter.projectile.speed = 5;
                         shooter.projectile.angle = shooter.angle;
                         shooter.projectile.color = shooter.next_bubbles[0];
+                        j = 0;
                         for (i = 1; i < available_colors[0] + 1; i++) {
                             if (available_colors[i] == shooter.next_bubbles[1]) {
                                 shooter.next_bubbles[0] = shooter.next_bubbles[1];
+                                j = 1;
+                                break;
                             }
                         }
-                        if (i == available_colors[0] + 1) { //next bubble color not in grid
-                            shooter.next_bubbles[0] = randInt(1, available_colors[0]);
+                        if (!j) {
+                            shooter.next_bubbles[0] = available_colors[randInt(1, available_colors[0])];
                         }
                         shooter.next_bubbles[1] = shooter.next_bubbles[2];
                         getAvailableColors(grid, available_colors);
@@ -633,9 +638,9 @@ void game(void) {
             }
             if (!j) {
                 dbg_printf("New level!");
-                if (current_game == LEVELS)
+                if (current_game == LEVELS) {
                     game_flags |= NEW_LEVEL;
-                    game_status = NEXT_LEVEL;
+                }
             }
         }
         if (game_flags & PUSHDOWN) {
@@ -661,7 +666,7 @@ void game(void) {
                 }
             }
             if (current_game == SURVIVAL) {
-                if (max_color < MAX_POSSIBLE_COLOR && turn_counter && turn_counter % 25 == 0) {
+                if (max_color < MAX_POSSIBLE_COLOR && global_counter && global_counter % 15 == 0) {
                     available_colors[++available_colors[0]] = ++max_color;
                 }
             }
