@@ -690,9 +690,6 @@ void game(void) {
         
         if (game_flags & NEW_ROW) {
             addNewRow(grid, available_colors, 9);
-            if (current_game == SURVIVAL && !auto_new_row_counter) {
-                grid.possible_collisions = getPossibleCollisions(grid);
-            }
             if (game_flags & AUTO_FILL) {
                 if (rowHasBubbles(grid, grid.rows - 1)) { //last row full, push upward
                     grid.rows++;
@@ -702,6 +699,9 @@ void game(void) {
                 if (!auto_new_row_counter) {
                     game_flags &= ~AUTO_FILL;
                 }
+            }
+            if (current_game == SURVIVAL && !auto_new_row_counter) {
+                grid.possible_collisions = getPossibleCollisions(grid);
             }
             game_flags &= ~NEW_ROW;
         }
