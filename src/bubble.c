@@ -15,7 +15,7 @@
 /*Globals*/
 uint8_t row_offset; // 0: even row; 1: odd row
 uint8_t max_color;
-unsigned int player_score;
+extern unsigned int player_score;
 unsigned int turn_counter;
 unsigned int global_counter;
 unsigned int push_down_time;
@@ -514,8 +514,8 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
             if (fall_total > 0) {
                 game_flags |= FALL;
                 fall_data.size = fall_total;
-                for (i = 0; i < fall_total; i++) {
-                    player_score += 50 * (i + 1);
+                for (i = 1; i < fall_total + 1; i++) {
+                    player_score += 50 * i;
                 }
                 j = 0;
                 for (i = 0; i < grid.rows * grid.cols; i++) {

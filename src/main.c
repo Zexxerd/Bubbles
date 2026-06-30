@@ -12,6 +12,7 @@
 #include <string.h>
 #include <graphx.h>
 #include <keypadc.h>
+#include <fileioc.h>
 #include <debug.h>
 
 #include "main.h"
@@ -19,7 +20,7 @@
 #include "key.h"
 #include "game.h"
 #include "gfx/bubble.h"
-
+#include "high_score.h"
 
 //matrix(x,y) = matrix((y * matrix_cols) + x)
 /**
@@ -41,6 +42,7 @@ bool quit;
 
 char lose_string[] = "You Lose!";
 char win_string[] = "You Win!";
+char best_shooters_string[] = "Best Shooters";
 
 char option_strings[4][18] = {
     "SURVIVAL!",
@@ -55,28 +57,36 @@ bool kb_clear_press, kb_clear_prev;
 bool kb_up_press, kb_up_prev;
 bool kb_down_press, kb_down_prev;
 
+unsigned int player_score;
+
 int main(void) {
     //int i,j,k;
     //point_t point;
     uint16_t saved_palette[256];
-
+    uint8_t high_score_appvar;
+    unsigned int high_scores[3];
+    unsigned int temp;
+    uint8_t placement;
     game_status = STOPPED;
 
     option_lengths[0] = gfx_GetStringWidth(option_strings[0]);
     option_lengths[1] = gfx_GetStringWidth(option_strings[1]);
     //option_lengths[2] = gfx_GetStringWidth(option_strings[2]);
     //option_lengths[3] = gfx_GetStringWidth(option_strings[3]);
+    player_score = 0;
 
-    bool at_logo = true; // exit logo
-    bool booted = false; //
+    bool at_logo_animation = true; // 
     bool option_selected = false;
     bool gfx_pal_modified = false; //true if gfx_palette != saved_palette
-    uint8_t show_levels_not_implemented = false; //true if user selected levels option
-    //bool show_versus_not_implemented = false; //true if user selected versus option
+    bool show_levels_not_implemented = false; //true if user selected levels option
+    //bool high_scores_printed = false; //implement partial redraw first
     uint8_t option = 0;
     quit = false;
     int generic_timer = 0;
     uint8_t arrow_timer = 0;
+
+    high_score_appvar = newHighScoreTable();
+    getHighScores(high_score_appvar, high_scores);
 
     const uint8_t levels_not_implemented_color_index = (sizeof_bubble_pal >> 1) + 7;
     gfx_palette[255] = 0xFFFF;
@@ -105,7 +115,7 @@ int main(void) {
                 logo_top = 20;
                 memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                 gfx_pal_modified = false;
-                at_logo = false;
+                at_logo_animation = false;
             } else {
                 if (dark < 255) {
                     fade_in(saved_palette, &dark, 10);
@@ -117,7 +127,7 @@ int main(void) {
                     logo_top -= 5;
                     if (logo_top < 20) {
                         logo_top = 20;
-                        at_logo = false;
+                        at_logo_animation = false;
                     }
                 }
             }
@@ -166,6 +176,20 @@ int main(void) {
                         gfx_pal_modified = false;
                         //while(!os_GetCSC());
                         game();
+                        if (player_score > high_scores[HIGH_SCORE_TABLE_LENGTH - 1]) { //determine high score placement
+                            placement = HIGH_SCORE_TABLE_LENGTH - 1;
+                            high_scores[HIGH_SCORE_TABLE_LENGTH - 1] = player_score;
+                            for (uint8_t i = HIGH_SCORE_TABLE_LENGTH - 1; i > 0; i--) {
+                                if (high_scores[i - 1] > high_scores[i]) { //if in order, break
+                                    break;
+                                }
+                                placement--;
+                                temp = high_scores[i - 1];
+                                high_scores[i - 1] = high_scores[i];
+                                high_scores[i] = temp;
+                            }
+                        }
+            setHighScores(high_score_appvar, high_scores);
                         if (game_status != QUIT) {
                                 gfx_pal_modified = true;
                                 memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
@@ -207,13 +231,20 @@ int main(void) {
         gfx_SetTransparentColor(0x31);
         gfx_TransparentSprite(bubbles_logo, logo_left, logo_top);
         gfx_SetTransparentColor(0x00);
-        if (!at_logo) {
+        if (!at_logo_animation) {
             gfx_SetTextScale(2, 2);
             gfx_SetTextFGColor(0);
-            for (unsigned int i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) {
+            for (uint8_t i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) { //exclude Versus and Campaign
                 gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
             }
             gfx_PrintStringXY(">", 80, 100 + option * 24);
+            
+            gfx_PrintStringXY(best_shooters_string, centerx_image(LCD_WIDTH, gfx_GetStringWidth(best_shooters_string)), 172);
+            gfx_SetTextScale(1, 1);
+            for (uint8_t i = 0; i < HIGH_SCORE_TABLE_LENGTH; i++) {
+                gfx_PrintUIntXY(high_scores[i], 8, (LCD_WIDTH >> 1) - (8*8/2), 196 + i * 10);
+            }
+
             if (show_levels_not_implemented) {
                 if (single_press(kb_2nd_press, kb_2nd_prev)) {
                     bright = 0;
@@ -230,7 +261,7 @@ int main(void) {
                     }
                     gfx_SetTextScale(1, 1);
                     gfx_SetTextFGColor(levels_not_implemented_color_index);
-                    gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 16);
+                    gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 8);
                     if (!bright) {
                         generic_timer = 0;
                         show_levels_not_implemented = false;
@@ -239,38 +270,44 @@ int main(void) {
             }
         }
         gfx_BlitBuffer();
-        if (game_status == LOSE) {
-            dark = 0;
-            gfx_pal_modified = true;
-            gfx_SetTextFGColor(0);
-            while (dark < 255) {
-                dark += 10;
-                if (dark > 255) {
-                    dark = 255;
+        switch (game_status) {
+            case LOSE:
+                dark = 0;
+                gfx_pal_modified = true;
+                gfx_SetTextFGColor(0);
+                while (dark < 255) {
+                    dark += 10;
+                    if (dark > 255) {
+                        dark = 255;
+                    }
+                    for (int i = 0; i < 256; i++) {
+                        gfx_palette[i] = gfx_Darken(saved_palette[i], dark);
+                    }
                 }
-                for (int i = 0; i < 256; i++) {
-                    gfx_palette[i] = gfx_Darken(saved_palette[i], dark);
+                game_status = STOPPED; 
+                break;
+            case WIN:
+                bright = 0;
+                gfx_pal_modified = true;
+                gfx_SetTextFGColor(0);
+                while (bright < 255) {
+                    bright += 10;
+                    if (bright > 255) {
+                        bright = 255;
+                    }
+                    for (int i = 0; i < 256; i++) {
+                        gfx_palette[i] = gfx_Lighten(saved_palette[i], bright);
+                    }
                 }
-            }
-            game_status = STOPPED;
-        } else if (game_status == WIN) {
-            bright = 0;
-            gfx_pal_modified = true;
-            gfx_SetTextFGColor(0);
-            while (bright < 255) {
-                bright += 10;
-                if (bright > 255) {
-                    bright = 255;
-                }
-                for (int i = 0; i < 256; i++) {
-                    gfx_palette[i] = gfx_Lighten(saved_palette[i], bright);
-                }
-            }
-            game_status = STOPPED;
+                game_status = STOPPED;
+                break;
+            default:
+                break;
         }
         if (quit) {
             break;
         }
     }
+    ti_Close(high_score_appvar);
     gfx_End();
 }

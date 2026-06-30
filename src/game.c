@@ -44,13 +44,13 @@ static char * printfloat(float elapsed) {
     return str;
 }
 
+
 extern uint8_t row_offset; // 0: even row shifted; 1: odd row shifted
 extern uint8_t max_color;
 extern uint8_t * available_colors;
 
 extern uint8_t game_flags; //global because our grid no longer holds it
 extern uint8_t new_row_rate;
-extern unsigned int player_score;
 extern unsigned int turn_counter;
 extern unsigned int global_counter; //always increments, unlike turn counter
 extern unsigned int push_down_time;
@@ -123,7 +123,6 @@ void game(void) {
     uint8_t level_number_len;
     bool level_start_finished;
     char * level_type_text;
-    bool lost, won;
 
     //grid, shooter
     shooter_t shooter;
@@ -231,8 +230,6 @@ void game(void) {
     draw_behind_proj_sprite = false;
     
     game_status = RUNNING;
-    lost = false;
-    won = false;
 
     strcpy(fps_string,"FPS: ");
     fps_counter = 0;
@@ -789,8 +786,7 @@ void game(void) {
                 gfx_PrintIntXY(push_down_time,3,74,40);
             }
             gfx_PrintStringXY("Score: ",0,48);
-            gfx_SetTextXY(60,48);
-            gfx_PrintInt(player_score,5);
+            gfx_PrintUIntXY(player_score, 6, 52, 48);
             gfx_PrintStringXY("Angle:", 0, 56);
             gfx_PrintIntXY(shooter.angle, 3, 74, 56);
             #ifdef DEBUG
