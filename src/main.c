@@ -68,19 +68,23 @@ int main(void) {
     unsigned int temp;
     uint8_t placement;
     game_status = STOPPED;
+    player_score = 0;
 
     option_lengths[0] = gfx_GetStringWidth(option_strings[0]);
     option_lengths[1] = gfx_GetStringWidth(option_strings[1]);
     //option_lengths[2] = gfx_GetStringWidth(option_strings[2]);
     //option_lengths[3] = gfx_GetStringWidth(option_strings[3]);
-    player_score = 0;
 
     bool at_logo_animation = true; // 
     bool option_selected = false;
     bool gfx_pal_modified = false; //true if gfx_palette != saved_palette
     bool show_levels_not_implemented = false; //true if user selected levels option
-    //bool high_scores_printed = false; //implement partial redraw first
-    uint8_t option = 0;
+    //bool menu_dirty = true;
+    bool logo_dirty = true;
+    bool options_dirty = true;
+    bool scores_dirty = true;
+    bool levels_not_implemented_dirty = true;
+    uint8_t option = 0, prev_option = 0xFF;
     quit = false;
     int generic_timer = 0;
     uint8_t arrow_timer = 0;
@@ -91,18 +95,19 @@ int main(void) {
     const uint8_t levels_not_implemented_color_index = (sizeof_bubble_pal >> 1) + 7;
     gfx_palette[255] = 0xFFFF;
     gfx_palette[levels_not_implemented_color_index] = 0x0000;
-
+    int logo_left = centerx_image(LCD_WIDTH, bubbles_logo_width);
+    int logo_top = centery_image(LCD_HEIGHT, bubbles_logo_height);
+    int old_logo_top = logo_top;
+    int dark = 0;
+    int bright = 0;
     gfx_Begin();
     gfx_SetDrawBuffer();
     gfx_SetPalette(bubble_pal, sizeof_bubble_pal, 0);
     gfx_SetPalette(bubble_colors, 14, sizeof_bubble_pal >> 1);
     gfx_SetPalette(bubbles_logo_pal, sizeof_bubbles_logo_pal, 49);
     memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
-    int logo_left = centerx_image(LCD_WIDTH, bubbles_logo_width);
-    int logo_top = centery_image(LCD_HEIGHT, bubbles_logo_height);
-    int dark = 0;
-    int bright = 0;
-
+    gfx_FillScreen(0xFF);
+    gfx_BlitBuffer();
     gfx_pal_modified = true;
     while (true) {
         kb_Scan();
@@ -110,12 +115,14 @@ int main(void) {
         kb_2nd_press = kb_Data[1] & kb_2nd;
         kb_clear_prev = kb_clear_press;
         kb_clear_press = kb_Data[6] & kb_Clear;
-        if (logo_top > 20) {
+        if (at_logo_animation) {
             if (single_press(kb_2nd_press, kb_2nd_prev)) {
+                old_logo_top = logo_top;
                 logo_top = 20;
                 memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                 gfx_pal_modified = false;
                 at_logo_animation = false;
+                logo_dirty = true;
             } else {
                 if (dark < 255) {
                     fade_in(saved_palette, &dark, 10);
@@ -124,11 +131,13 @@ int main(void) {
                         memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
                         gfx_pal_modified = false;
                     }
+                    old_logo_top = logo_top;
                     logo_top -= 5;
                     if (logo_top < 20) {
                         logo_top = 20;
                         at_logo_animation = false;
                     }
+                    logo_dirty = true;
                 }
             }
         } else {
@@ -136,9 +145,13 @@ int main(void) {
                 if (single_press(kb_2nd_press, kb_2nd_prev)) {
                     option_selected = true;
                 } else if (kb_Data[7] & kb_Up) {
+                    prev_option = option;
                     option -= option ? 1 : 0;
+                    //options_dirty = true;
                 } else if (kb_Data[7] & kb_Down) {
+                    prev_option = option;
                     option += (option < 1) ? 1 : 0;
+                    //options_dirty = true;
                 } else if (single_press(kb_clear_press, kb_clear_prev)) {
                     quit = true;
                 }
@@ -170,12 +183,14 @@ int main(void) {
                                 gfx_palette[i] = gfx_Lighten(saved_palette[i], bright);
                             }
                         }
+                        gfx_SetDrawScreen();
                         gfx_FillScreen(0xFF);
                         memcpy(gfx_palette, saved_palette, sizeof(saved_palette));
-                        gfx_BlitBuffer();
                         gfx_pal_modified = false;
+                        gfx_SetDrawBuffer();
                         //while(!os_GetCSC());
                         game();
+                        logo_dirty = options_dirty = scores_dirty = levels_not_implemented_dirty = true;
                         if (player_score > high_scores[HIGH_SCORE_TABLE_LENGTH - 1]) { //determine high score placement
                             placement = HIGH_SCORE_TABLE_LENGTH - 1;
                             high_scores[HIGH_SCORE_TABLE_LENGTH - 1] = player_score;
@@ -213,6 +228,8 @@ int main(void) {
                                     }
                                 }
                             }
+                        } else {
+                            gfx_FillScreen(0xFF);
                         }
                         option_selected = false;
                     }
@@ -221,51 +238,76 @@ int main(void) {
                         gfx_palette[levels_not_implemented_color_index] = BLACK;
                         bright = 255;
                         generic_timer = 0;
+                        levels_not_implemented_dirty = true;
                         show_levels_not_implemented = true;
+                    } else {
+                        bright = 0;
+                        generic_timer = 40;
+                        gfx_palette[levels_not_implemented_color_index] = BLACK;
                     }
                     option_selected = false;
                 }
             }
         }
-        gfx_FillScreen(0xFF);
-        gfx_SetTransparentColor(0x31);
-        gfx_TransparentSprite(bubbles_logo, logo_left, logo_top);
-        gfx_SetTransparentColor(0x00);
+        //gfx_FillScreen(0xFF);
+        if (logo_dirty) {
+            gfx_SetColor(0xFF);
+            gfx_FillRectangle_NoClip(logo_left, old_logo_top, bubbles_logo_width, bubbles_logo_height);
+            gfx_SetTransparentColor(0x31);
+            gfx_TransparentSprite(bubbles_logo, logo_left, logo_top);
+            gfx_SetTransparentColor(0x00);
+            logo_dirty = false;
+        }
         if (!at_logo_animation) {
-            gfx_SetTextScale(2, 2);
-            gfx_SetTextFGColor(0);
-            for (uint8_t i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) { //exclude Versus and Campaign
-                gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
+            if (options_dirty) {
+                gfx_SetColor(0xFF);
+                gfx_FillRectangle_NoClip(80, 96, LCD_WIDTH - 80, 64);
+                gfx_SetTextScale(2, 2);
+                gfx_SetTextFGColor(0);
+                for (uint8_t i = 0; i < (sizeof(option_strings) / sizeof(option_strings[0])) - 2; i++) { //exclude Versus and Campaign
+                    gfx_PrintStringXY(option_strings[i], 96, 100 + i * 24);
+                }
+                options_dirty = false;
             }
-            gfx_PrintStringXY(">", 80, 100 + option * 24);
-            
-            gfx_PrintStringXY(best_shooters_string, centerx_image(LCD_WIDTH, gfx_GetStringWidth(best_shooters_string)), 172);
-            gfx_SetTextScale(1, 1);
-            for (uint8_t i = 0; i < HIGH_SCORE_TABLE_LENGTH; i++) {
-                gfx_PrintUIntXY(high_scores[i], 8, (LCD_WIDTH >> 1) - (8*8/2), 196 + i * 10);
+            if (prev_option != option) {
+                gfx_FillRectangle_NoClip(80, 100 + prev_option * 24, 16, 16);
+                gfx_SetTextScale(2, 2);
+                gfx_SetTextFGColor(0);
+                gfx_SetTextXY(80, 100 + option * 24);
+                gfx_PrintChar('>');
+            }
+            if (scores_dirty) {
+                temp = centerx_image(LCD_WIDTH, gfx_GetStringWidth(best_shooters_string));
+                gfx_SetColor(0xFF);
+                gfx_FillRectangle(temp, 172, gfx_GetStringWidth(best_shooters_string), LCD_HEIGHT - 8);
+                gfx_PrintStringXY(best_shooters_string, centerx_image(LCD_WIDTH, gfx_GetStringWidth(best_shooters_string)), 172);
+                gfx_SetTextScale(1, 1);
+                for (uint8_t i = 0; i < HIGH_SCORE_TABLE_LENGTH; i++) {
+                    gfx_PrintUIntXY(high_scores[i], 8, (LCD_WIDTH >> 1) - (8*8/2), 196 + i * 10); //center high score text horizontally
+                }
+                scores_dirty = false;
             }
 
             if (show_levels_not_implemented) {
-                if (single_press(kb_2nd_press, kb_2nd_prev)) {
-                    bright = 0;
-                    generic_timer = 40;
-                    gfx_palette[levels_not_implemented_color_index] = BLACK;
-                    show_levels_not_implemented = false;
-                } else {
-                    if (generic_timer++ > 30) {
-                        gfx_SetTextFGColor(levels_not_implemented_color_index);
-                        if (bright > 0) {
-                            bright -= 5;
-                            gfx_palette[levels_not_implemented_color_index] = gfx_Lighten(gfx_palette[levels_not_implemented_color_index], bright);
-                        }
+                #ifdef DEBUG
+                dbg_printf("g = %d\n", generic_timer);
+                #endif
+                if (generic_timer++ > 30) {
+                    gfx_SetTextFGColor(levels_not_implemented_color_index);
+                    if (bright > 0) {
+                        bright -= 5;
+                        gfx_palette[levels_not_implemented_color_index] = gfx_Lighten(gfx_palette[levels_not_implemented_color_index], bright);
                     }
+                }
+                if (levels_not_implemented_dirty) {
                     gfx_SetTextScale(1, 1);
                     gfx_SetTextFGColor(levels_not_implemented_color_index);
                     gfx_PrintStringXY("Levels mode not yet implemented!", 20, LCD_HEIGHT - 8);
-                    if (!bright) {
-                        generic_timer = 0;
-                        show_levels_not_implemented = false;
-                    }
+                    levels_not_implemented_dirty = false;
+                }
+                if (!bright) {
+                    generic_timer = 0;
+                    show_levels_not_implemented = false;
                 }
             }
         }
