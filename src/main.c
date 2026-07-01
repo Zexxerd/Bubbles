@@ -86,7 +86,7 @@ int main(void) {
     bool levels_not_implemented_dirty = true;
     uint8_t option = 0, prev_option = 0xFF;
     quit = false;
-    int generic_timer = 0;
+    uint8_t generic_timer = 0;
     uint8_t arrow_timer = 0;
 
     high_score_appvar = newHighScoreTable();
@@ -241,9 +241,7 @@ int main(void) {
                         levels_not_implemented_dirty = true;
                         show_levels_not_implemented = true;
                     } else {
-                        bright = 0;
-                        generic_timer = 40;
-                        gfx_palette[levels_not_implemented_color_index] = BLACK;
+                        generic_timer = 60;
                     }
                     option_selected = false;
                 }
@@ -292,7 +290,7 @@ int main(void) {
                 #ifdef DEBUG
                 dbg_printf("g = %d\n", generic_timer);
                 #endif
-                if (generic_timer++ > 30) {
+                if (generic_timer++ > 60) {
                     gfx_SetTextFGColor(levels_not_implemented_color_index);
                     if (bright > 0) {
                         bright -= 5;

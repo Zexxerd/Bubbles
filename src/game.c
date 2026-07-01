@@ -408,7 +408,6 @@ void game(void) {
                     }
                 }
             } else {
-                dbg_printf("shooter is deactivated, cannot shoot\n");
                 shooter.flags |= SHAKE; //start shaking animation
                 shooter.counter = (uint8_t) fps / 3; //shake for 1/3 second
             }
@@ -634,7 +633,9 @@ void game(void) {
                 }
             }
             if (!j) {
+                #ifdef DEBUG
                 dbg_printf("New level!");
+                #endif
                 if (current_game == LEVELS) {
                     game_flags |= NEW_LEVEL;
                 }
@@ -709,7 +710,9 @@ void game(void) {
         //Display
         if (!(game_flags & NEW_LEVEL) && (current_game == SURVIVAL)) {
             if (shooter.flags & SHAKE) {
+                #ifdef DEBUG
                 dbg_printf("shaker: (%d, %d) %d\n",(shooter.shake_values & 0xF0) >> 4, shooter.shake_values & 0x0F, shooter.counter);
+                #endif
                 if (!shooter.counter) {
                     shooter.flags &= ~SHAKE;
                 } else {
@@ -896,7 +899,9 @@ void game(void) {
             gfx_BlitBuffer();
         }
         while (!os_GetCSC());
+        #ifdef DEBUG
         dbg_printf("exiting game loop\n");
+        #endif
         free(lose_animation_behind);
     }
     game_flags = 0x00;
