@@ -66,6 +66,7 @@ int main(void) {
     uint8_t high_score_appvar;
     unsigned int high_scores[3];
     unsigned int temp;
+    const uint16_t placement_colors[3] = {0x7F44, 0x6318, 0x65E6};
     uint8_t placement;
     game_status = STOPPED;
     player_score = 0;
@@ -91,8 +92,9 @@ int main(void) {
 
     high_score_appvar = newHighScoreTable();
     getHighScores(high_score_appvar, high_scores);
-
-    const uint8_t levels_not_implemented_color_index = (sizeof_bubble_pal >> 1) + 7;
+    placement = 0xFF; //invalid
+    const uint8_t levels_not_implemented_color_index = (sizeof_bubble_pal >> 1) + (sizeof(bubble_colors) >> 1);
+    const uint8_t placement_color_index = (sizeof_bubble_pal >> 1) + (sizeof(bubble_colors) >> 1) + 1;
     gfx_palette[255] = 0xFFFF;
     gfx_palette[levels_not_implemented_color_index] = 0x0000;
     int logo_left = centerx_image(LCD_WIDTH, bubbles_logo_width);
@@ -191,20 +193,21 @@ int main(void) {
                         //while(!os_GetCSC());
                         game();
                         logo_dirty = options_dirty = scores_dirty = levels_not_implemented_dirty = true;
+                        placement = HIGH_SCORE_TABLE_LENGTH;
                         if (player_score > high_scores[HIGH_SCORE_TABLE_LENGTH - 1]) { //determine high score placement
-                            placement = HIGH_SCORE_TABLE_LENGTH - 1;
                             high_scores[HIGH_SCORE_TABLE_LENGTH - 1] = player_score;
                             for (uint8_t i = HIGH_SCORE_TABLE_LENGTH - 1; i > 0; i--) {
+                                placement--;
                                 if (high_scores[i - 1] > high_scores[i]) { //if in order, break
                                     break;
                                 }
-                                placement--;
                                 temp = high_scores[i - 1];
                                 high_scores[i - 1] = high_scores[i];
                                 high_scores[i] = temp;
                             }
+                            gfx_palette[placement_color_index] = placement_colors[placement];
                         }
-            setHighScores(high_score_appvar, high_scores);
+                        setHighScores(high_score_appvar, high_scores);
                         if (game_status != QUIT) {
                                 gfx_pal_modified = true;
                                 memcpy(saved_palette, gfx_palette, sizeof(saved_palette));
@@ -228,9 +231,8 @@ int main(void) {
                                     }
                                 }
                             }
-                        } else {
-                            gfx_FillScreen(0xFF);
                         }
+                        gfx_FillScreen(0xFF);
                         option_selected = false;
                     }
                 } else {
@@ -275,12 +277,18 @@ int main(void) {
                 gfx_PrintChar('>');
             }
             if (scores_dirty) {
-                temp = centerx_image(LCD_WIDTH, gfx_GetStringWidth(best_shooters_string));
+                temp = gfx_GetStringWidth(best_shooters_string);
                 gfx_SetColor(0xFF);
-                gfx_FillRectangle(temp, 172, gfx_GetStringWidth(best_shooters_string), LCD_HEIGHT - 8);
+                gfx_FillRectangle(centerx_image(LCD_WIDTH, temp), 172, temp, LCD_HEIGHT - 8);
                 gfx_PrintStringXY(best_shooters_string, centerx_image(LCD_WIDTH, gfx_GetStringWidth(best_shooters_string)), 172);
                 gfx_SetTextScale(1, 1);
+                gfx_SetTextFGColor(0);
                 for (uint8_t i = 0; i < HIGH_SCORE_TABLE_LENGTH; i++) {
+                    if (placement < HIGH_SCORE_TABLE_LENGTH && i == placement) { //if player placed on the high score table, color their entry
+                        gfx_SetTextFGColor(placement_color_index);
+                    } else {
+                        gfx_SetTextFGColor(0); //BLACK
+                    }
                     gfx_PrintUIntXY(high_scores[i], 8, (LCD_WIDTH >> 1) - (8*8/2), 196 + i * 10); //center high score text horizontally
                 }
                 scores_dirty = false;
@@ -306,6 +314,7 @@ int main(void) {
                 if (!bright) {
                     generic_timer = 0;
                     show_levels_not_implemented = false;
+                    gfx_palette[levels_not_implemented_color_index] = WHITE;
                 }
             }
         }

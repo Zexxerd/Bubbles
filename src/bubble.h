@@ -49,10 +49,12 @@
 #define ACTIVE    (1<<0)
 
 //shooter
-#define ACTIVE_PROJ    (1<<0)
-#define DEACTIVATED    (1<<1)
+#define DEACTIVATED    (1<<0)
+#define ACTIVE_PROJ    (1<<1)
 #define REDRAW_SHOOTER (1<<2)
 #define SHAKE (1<<3)
+#define PROJ_HIT (1<<4)
+
 
 
 //grid
@@ -90,18 +92,6 @@ while (!os_GetCSC())
 dbg_printf("Location of " #pointer ": %x\n",(unsigned int) &pointer);\
 dbg_printf("Location of " #pointer " memory: %x\n",(unsigned int) pointer);\
 } while (0)
-
-//#define debug_flag() debug_flag = true //trashy, I know...
-
-/*enum * bubble_colors {
-    red = 0x7c00,
-    orange = 0x7e00,
-    yellow = 0x7fe0,
-    green = 0x8992,
-    blue = 0x001f,
-    purple = 0x401f,
-    violet = 0x7c1f,
-}*/
 
 typedef struct bubble {
     uint8_t x,y; //col,row

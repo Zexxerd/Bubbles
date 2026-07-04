@@ -238,14 +238,14 @@ void pushDown(grid_t * grid) {
     game_flags |= RENDER;
 }
 
+/**
+* Uses the drawing buffer to render the grid to the grid_buffer sprite.
+* This sprite can be drawn later as many times as needed.
+* @note grid.cols needs to be < 20 (LCD_WIDTH/TILE_WIDTH)
+* @note grid.rows needs to be < 26 (LCD_HEIGHT/ROW_HEIGHT)
+* Product of grid.cols and grid.rows is <= 256
+*/
 void renderGrid(grid_t grid,gfx_sprite_t * grid_buffer) {
-    /**
-     * Uses the drawing buffer to render the grid to the grid_buffer sprite.
-     * This sprite can be drawn later as many times as needed.
-     * @note grid.cols needs to be less than 20 (LCD_WIDTH/TILE_WIDTH)
-     * @note grid.rows needs to be less than 26 (LCD_HEIGHT/ROW_HEIGHT)
-     * Product of grid.cols and grid.rows is less than 257
-     */
     int i,j;
     bubble_t tile;
     point_t coord;
@@ -308,7 +308,6 @@ void renderShooter(shooter_t shooter) {
     gfx_Line(center.x,center.y,
         center.x + TILE_WIDTH1_5 * shooter.vectors[0][angle_index],
         center.y - TILE_HEIGHT1_5 * shooter.vectors[1][angle_index]);
-    //gfx_palette[shooter->pal_index] = bubble_colors[shooter->next_bubbles[0]];
     gfx_TransparentSprite(bubble_sprites[shooter.next_bubbles[0]],shooter_pos.x, shooter_pos.y);
     gfx_SetColor((sizeof_bubble_pal>>1)+shooter.next_bubbles[1]);
     gfx_FillCircle(center.x - 15,center.y + 6,5);
@@ -366,6 +365,7 @@ void moveProj(grid_t grid, shooter_t * shooter, float dt) {
                     grid.ball_diameter)) {
             snapBubble(shooter, grid);
             shooter->flags &= ~ACTIVE_PROJ;
+            shooter->flags |= PROJ_HIT;
             return;
         }
     }

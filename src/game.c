@@ -31,7 +31,7 @@
 #define TILE_HEIGHT 16
 #endif
 #ifndef MAX_ROWS
-#define MAX_ROWS 17
+#define MAX_ROWS 17 //16 + deadzone
 #endif
 #ifndef MIN_ROWS
 #define MIN_ROWS 5
@@ -129,7 +129,13 @@ void game(void) {
     grid_t grid;
     gfx_sprite_t * grid_buffer;
     gfx_sprite_t * behind_proj_sprite;
-    
+    gfx_sprite_t * behind_shooter_sprite;
+    //partial redraw
+    bool prev_proj_visible;
+    bool shooter_dirty;
+
+    point_t prev_shooter = {-1, -1};
+    point_t prev_proj = {-1, -1};
     //key presses
 
     //pop_sprite
@@ -140,7 +146,6 @@ void game(void) {
     bubble_list_t animation_list;
     gfx_sprite_t * lose_animation_behind;
     
-    bool draw_behind_proj_sprite;
     //grid settings
     max_color = 3; //max color index, 0 to max_color inclusive
     new_row_rate = 10;
@@ -174,15 +179,13 @@ void game(void) {
         shooter.next_bubbles[i] = randInt(0, max_color);
     shooter.flags = DEACTIVATED;
     shooter.vectors = generateVectors(-64, 64, 4);
-    shooter.projectile.x = 0;
-    shooter.projectile.y = 0;
     shooter.projectile.color = shooter.next_bubbles[0];
     shooter.projectile.visible = false;
     shooter.projectile.angle = 0;
     shooter.counter = 0;
     //grid
     grid.cols = 7;
-    grid.rows = MAX_ROWS; //16 + deadzone
+    grid.rows = MAX_ROWS;
     grid.x = centerX(((TILE_WIDTH * grid.cols) + (TILE_WIDTH >> 1)), LCD_WIDTH);
     grid.y = 0;
     grid.ball_diameter = TILE_WIDTH;
@@ -192,7 +195,7 @@ void game(void) {
     if (grid.bubbles == NULL) exit(1);
     grid.possible_collisions.bubbles = NULL;
     //declare an image buffer for the grid
-    grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * grid.rows + (TILE_WIDTH>>2));
+    grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * MAX_ROWS + (TILE_WIDTH>>2));
     if (grid_buffer == NULL) exit(1);
     game_flags = RENDER | NEW_LEVEL;
 
@@ -222,13 +225,19 @@ void game(void) {
     fall_total = 0;
 
     //redraw
-    behind_proj_sprite = gfx_MallocSprite(16, 16);
+    behind_shooter_sprite = gfx_MallocSprite(TILE_WIDTH, TILE_HEIGHT);
+    if (!behind_shooter_sprite) {
+        debug_message("behind_shooter_sprite alloc fail!?>!! >:(");
+        exit(1);
+    }
+    behind_proj_sprite = gfx_MallocSprite(TILE_WIDTH, TILE_HEIGHT);
     if (!behind_proj_sprite) {
         debug_message("behind_proj_sprite alloc fail!!! >:(");
         exit(1);
     }
-    draw_behind_proj_sprite = false;
-    
+    prev_proj_visible = false;
+    shooter_dirty = false;
+
     game_status = RUNNING;
 
     strcpy(fps_string,"FPS: ");
@@ -264,11 +273,12 @@ void game(void) {
         kb_up_press = kb_Data[7] & kb_Up;
         kb_down_prev = kb_down_press;
         kb_down_press = kb_Data[7] & kb_Down;
-        if (game_flags & RENDER) {
+        /*if (game_flags & RENDER) {
             renderGrid(grid, grid_buffer);
             game_flags &= ~RENDER;
-        }
-        gfx_FillScreen(255);  //Goal: change render method to partial
+        }*/
+        
+        //gfx_FillScreen(255);  //Goal: change render method to partial
         if (game_flags & NEW_LEVEL) {
             if (!level_start_finished) {
                 gfx_SetTextScale(4, 4);
@@ -290,6 +300,7 @@ void game(void) {
                     gfx_palette[0] = ((32 - (level_start_y_pos >> 1)) << 11) | ((64 - level_start_y_pos) << 5) | (32 - (level_start_y_pos >> 1));
                     level_start_y_pos += 2;
                 }
+                gfx_FillScreen(255);
                 if (current_game == SURVIVAL) {
                     gfx_PrintStringXY(level_type_text, 0, level_start_y_pos);
                 } else if (current_game == LEVELS) {
@@ -680,10 +691,6 @@ void game(void) {
         
         //Move the projectile
         
-        if (draw_behind_proj_sprite) {
-            gfx_Sprite(behind_proj_sprite, shooter.projectile.x, shooter.projectile.y);
-            draw_behind_proj_sprite = false;
-        }
         if (shooter.flags & ACTIVE_PROJ) {
             fps_ratio = fps / last_fps;
             moveProj(grid, &shooter, fps_ratio * 2);
@@ -708,7 +715,7 @@ void game(void) {
         }
 
         //Display
-        if (!(game_flags & NEW_LEVEL) && (current_game == SURVIVAL)) {
+        if (!(game_flags & NEW_LEVEL)) {
             if (shooter.flags & SHAKE) {
                 #ifdef DEBUG
                 dbg_printf("shaker: (%d, %d) %d\n",(shooter.shake_values & 0xF0) >> 4, shooter.shake_values & 0x0F, shooter.counter);
@@ -716,26 +723,51 @@ void game(void) {
                 if (!shooter.counter) {
                     shooter.flags &= ~SHAKE;
                 } else {
-                    shooter.shake_values = (randInt(-2, 2) << 4) | randInt(-2, 2);
+                    shooter.shake_values = (randInt(-2, 2) << 4) | (randInt(-2, 2) & 15);
                     shooter.counter--;
                 }
             } else {
                 shooter.shake_values = 0;
             }
-            renderShooter(shooter);
+
+            //create grid sprite
+            if (game_flags & RENDER) {
+                renderGrid(grid, grid_buffer);
+                game_flags &= ~RENDER;
+            }
+            gfx_FillScreen(255);
+            //draw grid
             gfx_TransparentSprite(grid_buffer, grid.x, grid.y);
-            gfx_SetColor(0);
+
+            gfx_SetColor(0); //BLACK
             gfx_Rectangle(grid.x, grid.y, grid.width, grid.height - ROW_HEIGHT);
+
+            /*if (prev_shooter.x >= 0) {
+                gfx_Sprite(behind_shooter_sprite, prev_shooter.x, prev_shooter.y);
+            }*/
+            //gfx_GetSprite(behind_shooter_sprite, shooter.x, shooter.y);
+            renderShooter(shooter);
+            //prev_shooter.x = shooter.x;
+            //prev_shooter.y = shooter.y;
+
+            //if (prev_proj_visible) {
+            //    gfx_Sprite(behind_proj_sprite, prev_proj.x, prev_proj.y);
+            //}
+            if (shooter.flags & PROJ_HIT) { //show projectile for impact frame
+                shooter.projectile.visible = false;
+                shooter.flags &= ~PROJ_HIT;
+            }
             
             if (shooter.projectile.visible) {
-                /*
-                gfx_GetSprite(behind_proj_sprite,shooter.projectile.x,shooter.projectile.y);
-                draw_behind_proj_sprite = true;*/
+                //gfx_GetSprite(behind_proj_sprite, shooter.projectile.x, shooter.projectile.y);
                 gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
+                prev_proj.x = shooter.projectile.x;
+                prev_proj.y = shooter.projectile.y;
+                prev_proj_visible = true;
+            } else {
+                prev_proj_visible = false;
             }
-            if (game_flags & RENDER) {
-                shooter.projectile.visible = false;
-            }
+
             if (pop_started) {
                 for (i = 0; i < pop_cluster.size; i++) { //animate
                     if (pop_counter & 1) {

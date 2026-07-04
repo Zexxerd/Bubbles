@@ -1,7 +1,7 @@
 
 #include "high_score.h"
 
-uint8_t newHighScoreTable() {
+uint8_t newHighScoreTable(void) {
     /**Creates a new high score table AppVar*/
     uint8_t high_score_appvar; //AppVar
     uint8_t return_code;
