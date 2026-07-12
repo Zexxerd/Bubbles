@@ -33,6 +33,9 @@
 #ifndef MAX_ROWS
 #define MAX_ROWS 17 //16 + deadzone
 #endif
+#ifndef MAX_COLS
+#define MAX_COLS 7 //SURVIVAL
+#endif
 #ifndef MIN_ROWS
 #define MIN_ROWS 5
 #endif
@@ -78,7 +81,7 @@ extern gfx_sprite_t * bubble_pop_sprites[7];
 extern const uint16_t bubble_colors[7];
 
 extern bool pop_started;
-extern point_t * pop_locations;
+extern point_t pop_locations[MAX_ROWS * MAX_COLS];
 extern bubble_list_t pop_cluster;
 extern uint8_t pop_counter; // timer for pop animation
 
@@ -132,7 +135,6 @@ void game(void) {
     gfx_sprite_t * behind_shooter_sprite;
     //partial redraw
     bool prev_proj_visible;
-    bool shooter_dirty;
 
     point_t prev_shooter = {-1, -1};
     point_t prev_proj = {-1, -1};
@@ -236,7 +238,6 @@ void game(void) {
         exit(1);
     }
     prev_proj_visible = false;
-    shooter_dirty = false;
 
     game_status = RUNNING;
 
@@ -572,12 +573,6 @@ void game(void) {
 #endif //DEBUG
         if (game_flags & POP) {
             if (!pop_started) {
-                pop_locations = (point_t *) malloc(sizeof(point_t) * pop_cluster.size);
-                if (pop_locations == NULL) {
-                    debug_message("pop_locations null!!!! :(");
-                    exit(1);
-                }
-
                 pop_sprite = bubble_pop_sprites[pop_cluster.bubbles[0].color];
                 pop_sprite_rotations[0] = gfx_FlipSpriteY(pop_sprite,pop_sprite_rotations[0]);
                 pop_sprite_rotations[1] = gfx_FlipSpriteX(pop_sprite,pop_sprite_rotations[1]);
@@ -586,7 +581,6 @@ void game(void) {
                     point = getTileCoordinate(pop_cluster.bubbles[i].x,pop_cluster.bubbles[i].y);
                     pop_locations[i].x = point.x + grid.x;
                     pop_locations[i].y = point.y + grid.y;
-                    
                 }
                 pop_started = true;
             }
@@ -595,10 +589,6 @@ void game(void) {
                 pop_counter = 0;
                 pop_started = false;
                 game_flags &= ~POP;
-                free(pop_locations);
-                pop_locations = NULL;
-                free(pop_cluster.bubbles);
-                pop_cluster.bubbles = NULL;
                 pop_cluster.size = 0;
             }
         }
@@ -956,12 +946,10 @@ void game(void) {
     free(fall_data.bubbles);
     fall_data.bubbles = NULL;
     fall_data.size = fall_total = 0;
-    free(fps_string);
     for (i = 0; i < 3; i++) {
         free(pop_sprite_rotations[i]);
     }
     if (pop_started) {
-        free(pop_locations);
-        free(pop_cluster.bubbles);
+        //free(pop_cluster.bubbles);
     }
 }

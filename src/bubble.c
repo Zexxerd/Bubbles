@@ -16,6 +16,12 @@
 #define NEIGHBORS_SIZE 6
 #endif
 
+#ifndef MAX_ROWS
+#define MAX_ROWS 17
+#endif
+#ifndef MAX_COLS
+#define MAX_COLS 7
+#endif
 /*Globals*/
 uint8_t row_offset; // 0: even row; 1: odd row
 uint8_t max_color;
@@ -32,7 +38,7 @@ char string[100];
 #endif
 
 bool pop_started; //handles initial condition
-point_t * pop_locations;
+point_t pop_locations[MAX_ROWS * MAX_COLS];
 bubble_list_t pop_cluster;
 uint8_t pop_counter;// timer for pop animation
 
@@ -110,6 +116,7 @@ bubble_list_t copyBubbleList(bubble_list_t original) {
     new.size = original.size;
     new.bubbles = (bubble_t *) malloc(original.size * sizeof(bubble_t));
     if (new.bubbles == NULL) exit(1);
+
     for (int i = 0;i < original.size;i++) {
         new.bubbles[i] = original.bubbles[i];
     }
@@ -508,7 +515,6 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
             if (game_flags & POP) { //animation already started, free bubbles to let it restart
                 pop_counter = 0;
                 pop_started = false;
-                free(pop_locations);
                 free(pop_cluster.bubbles);
             }
             game_flags |= POP; //pop animation starts
@@ -551,7 +557,6 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
                 }
             }
         }
-        free(cluster.bubbles);
     }
     global_counter++;
     game_flags |= CHECK;
@@ -592,11 +597,12 @@ bubble_list_t getNeighbors(grid_t grid, uint8_t tilex, uint8_t tiley, bool add_e
 
 bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchtype,bool reset,bool skipremoved) {
     int i;
-    static bubble_list_t toprocess;
+    bubble_list_t toprocess;
+    bubble_t toprocess_bubbles[MAX_ROWS * MAX_COLS];
     bubble_list_t foundcluster;
+    static bubble_t foundcluster_bubbles[MAX_ROWS * MAX_COLS];
     bubble_list_t neighbors;
     bubble_t targettile, currenttile;
-        
     toprocess.size = 1;
     foundcluster.size = 1;
     neighbors.size = 0;
@@ -607,14 +613,9 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
     targettile = grid.bubbles[(tile_y * grid.cols) + tile_x];
     
     // Initialize the toprocess array with the specified tile
-    if (toprocess.bubbles == NULL) {
-        if ((toprocess.bubbles = (bubble_t *) malloc((grid.rows)*grid.cols*sizeof(bubble_t))) == NULL) // malloc(256*sizeof(bubble_t))
-            exit(1); //oopsie doopsie!
-    }
-    
-    if ((foundcluster.bubbles = (bubble_t *) malloc((grid.rows)*grid.cols*sizeof(bubble_t))) == NULL) {
-        exit(1); //oopers doopers!
-    }
+    toprocess.bubbles = toprocess_bubbles;
+    foundcluster.bubbles = foundcluster_bubbles;
+
     toprocess.bubbles[0] = targettile;
     grid.bubbles[(tile_y * grid.cols) + tile_x].flags |= PROCESSED;
     toprocess.bubbles[0].flags |= PROCESSED;
@@ -622,7 +623,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
         // Pop the last element from the array
         currenttile = toprocess.bubbles[toprocess.size - 1];
         toprocess.size--;
-//        toprocess.bubbles = realloc(toprocess.bubbles,(--toprocess.size) * sizeof(bubble_t));
+
         // Skip processed and empty tiles
         if (currenttile.flags & EMPTY) {
             continue;
@@ -636,7 +637,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
         if (!matchtype || (currenttile.color == targettile.color)) {
             // Add current tile to the cluster
 //            foundcluster.bubbles = realloc(foundcluster.bubbles,(++foundcluster.size)*sizeof(bubble_t));
-            foundcluster.bubbles[foundcluster.size-1] = currenttile;
+            foundcluster.bubbles[foundcluster.size - 1] = currenttile;
             foundcluster.size++;
             // Get the neighbors of the current tile
             neighbors = getNeighbors(grid, currenttile.x, currenttile.y, true);
@@ -653,10 +654,7 @@ bubble_list_t findCluster(grid_t grid,uint8_t tile_x,uint8_t tile_y,bool matchty
             }
         }
     }
-    foundcluster.bubbles = (bubble_t *) realloc(foundcluster.bubbles,(--foundcluster.size)*sizeof(bubble_t));
-    if (foundcluster.bubbles == NULL) {
-        exit(1); //oopsie daloopsie!
-    }
+
     return foundcluster;
 }
 
@@ -700,21 +698,17 @@ bubble_list_t getPossibleCollisions(grid_t grid) {
     uint8_t i;
     unsigned int size;
     static bubble_list_t possible_collisions;
+    static bubble_t possible_collisions_bubbles[MAX_ROWS * 7];
     possible_collisions.size = 0;
-    if (possible_collisions.bubbles == NULL) {
-        possible_collisions.bubbles = (bubble_t *) malloc(grid.rows * grid.cols * sizeof(bubble_t));
-        if (possible_collisions.bubbles == NULL) {
-            exit(1); //failure...
-        }
-    }
     size = grid.rows * grid.cols;
     for (i = 0; i < size; i++) {
         if (!(grid.bubbles[i].flags & EMPTY)) {
             if (getNeighbors(grid, grid.bubbles[i].x, grid.bubbles[i].y, true).size != getNeighbors(grid, grid.bubbles[i].x, grid.bubbles[i].y, false).size) {
-                possible_collisions.bubbles[possible_collisions.size++] = grid.bubbles[i];
+                possible_collisions_bubbles[possible_collisions.size++] = grid.bubbles[i];
             }
         }
     }
+    possible_collisions.bubbles = possible_collisions_bubbles;
     return possible_collisions;
 }
 bool rowHasBubbles(grid_t grid, const uint8_t row) {
