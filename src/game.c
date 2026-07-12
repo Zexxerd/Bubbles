@@ -105,7 +105,7 @@ void game(void) {
     uint8_t fps_counter;
     float fps_ratio;
     float fps, last_fps, ticks;
-    char fps_string[15];
+    char * fps_string;
     char * end_of_game_string;
 #ifdef DEBUG
     uint8_t x, y;
@@ -160,6 +160,7 @@ void game(void) {
     global_counter = 0;
     player_score = 0;
     fps = last_fps = 30;
+    fps_string = malloc(15 * sizeof(char));
 
     //level
     level_number = 0;
@@ -172,14 +173,13 @@ void game(void) {
     shooter.x = 160 - (TILE_WIDTH >> 1);
     shooter.y = 220 - (TILE_HEIGHT >> 1);
     shooter.angle = 0;
-    shooter.prev_angle = 0;
     shooter.pal_index  = (sizeof_bubble_pal >> 1) + 7;
     shooter.projectile.x = 0;
     shooter.projectile.y = 0;
     shooter.projectile.speed = 5;
     for (i = 0; i < 3; i++)
         shooter.next_bubbles[i] = randInt(0, max_color);
-    shooter.flags = REDRAW_SHOOTER | DEACTIVATED;
+    shooter.flags = DEACTIVATED;
     shooter.vectors = generateVectors(-64, 64, 4);
     shooter.projectile.color = shooter.next_bubbles[0];
     shooter.projectile.visible = false;
@@ -190,7 +190,7 @@ void game(void) {
     grid.rows = MAX_ROWS;
     grid.x = centerX(((TILE_WIDTH * grid.cols) + (TILE_WIDTH >> 1)), LCD_WIDTH);
     grid.y = 0;
-    grid.ball_radius = (TILE_WIDTH >> 1) + (TILE_WIDTH >> 2); //TILE_WIDTH/2 is way too small, TILE_WIDTH can feel too big
+    grid.ball_diameter = TILE_WIDTH;
     grid.width = (TILE_WIDTH * grid.cols) + (TILE_WIDTH>>1);
     grid.height = (ROW_HEIGHT * grid.rows) + (TILE_WIDTH>>2);
     grid.bubbles = (bubble_t *) malloc((grid.cols*grid.rows) * sizeof(bubble_t));
@@ -274,6 +274,10 @@ void game(void) {
         kb_up_press = kb_Data[7] & kb_Up;
         kb_down_prev = kb_down_press;
         kb_down_press = kb_Data[7] & kb_Down;
+        /*if (game_flags & RENDER) {
+            renderGrid(grid, grid_buffer);
+            game_flags &= ~RENDER;
+        }*/
         
         //gfx_FillScreen(255);  //Goal: change render method to partial
         if (game_flags & NEW_LEVEL) {
@@ -311,7 +315,6 @@ void game(void) {
                     level_start_finished = true;
                     game_flags &= ~NEW_LEVEL;
                     kb_Reset();
-                    gfx_FillScreen(255);
                 }
                 gfx_BlitBuffer();
                 continue;
@@ -331,9 +334,8 @@ void game(void) {
             x -= (x > 0);
 #endif
             if (shooter.angle > LBOUND) {
-                shooter.prev_angle = shooter.angle;
                 shooter.angle -= SHOOTER_STEP;
-                shooter.flags |= REDRAW_SHOOTER;
+                //shooter.flags |= REDRAW_SHOOTER;
             }
             
         }
@@ -342,9 +344,8 @@ void game(void) {
             x += (x < grid.cols-1);
 #endif
             if (shooter.angle < RBOUND) {
-                shooter.prev_angle = shooter.angle;
                 shooter.angle += SHOOTER_STEP;
-                shooter.flags |= REDRAW_SHOOTER;
+                //shooter.flags |= REDRAW_SHOOTER;
             }
         }
         #ifdef DEBUG //in debug mode, we want to disable moving the grid when comma is pressed
@@ -410,7 +411,7 @@ void game(void) {
                         }
                         shooter.next_bubbles[2] = available_colors[randInt(1, available_colors[0])];
                         shooter.projectile.visible = true;
-                        shooter.flags |= REDRAW_SHOOTER | ACTIVE_PROJ;
+                        shooter.flags |= ACTIVE_PROJ;
                     } else {
                         if (!(game_flags & POP)) {
                             shooter.flags |= SHAKE;
@@ -711,52 +712,44 @@ void game(void) {
                 #endif
                 if (!shooter.counter) {
                     shooter.flags &= ~SHAKE;
-                    shooter.shake_values = 0;
                 } else {
                     shooter.shake_values = (randInt(-2, 2) << 4) | (randInt(-2, 2) & 15);
                     shooter.counter--;
                 }
-                shooter.flags |= REDRAW_SHOOTER;
+            } else {
+                shooter.shake_values = 0;
             }
 
-            //draw grid
+            //create grid sprite
             if (game_flags & RENDER) {
-                //create grid sprite
                 renderGrid(grid, grid_buffer);
                 game_flags &= ~RENDER;
-                if (grid.y) {
-                    gfx_SetColor(255); //WHITE
-                    gfx_FillRectangle(grid.x, 0, grid.width, grid.y);
-                }
-                gfx_TransparentSprite(grid_buffer, grid.x, grid.y);
-                if (prev_proj_visible) {
-                    gfx_GetSprite(behind_proj_sprite, prev_proj.x, prev_proj.y);
-                }
-
             }
-            if (shooter.flags & PROJ_HIT) { //show projectile for impact frame
-                shooter.projectile.visible = false;
-                shooter.flags &= ~PROJ_HIT;
-            }
+            gfx_FillScreen(255);
+            //draw grid
+            gfx_TransparentSprite(grid_buffer, grid.x, grid.y);
 
             gfx_SetColor(0); //BLACK
             gfx_Rectangle(grid.x, grid.y, grid.width, grid.height - ROW_HEIGHT);
 
-            gfx_Sprite(behind_shooter_sprite, prev_shooter.x, prev_shooter.y); //should probably account for shake animation at some point
-            gfx_GetSprite(behind_shooter_sprite, shooter.x, shooter.y);
-            if (shooter.flags & REDRAW_SHOOTER) {
-                gfx_SetColor(255);
-                gfx_FillRectangle(shooter.x - 30, shooter.y - TILE_HEIGHT, 30 + (TILE_WIDTH << 1), TILE_HEIGHT1_5 + TILE_HEIGHT + 12);
-                renderShooter(shooter);
-                shooter.flags &= ~REDRAW_SHOOTER;
-            }
+            /*if (prev_shooter.x >= 0) {
+                gfx_Sprite(behind_shooter_sprite, prev_shooter.x, prev_shooter.y);
+            }*/
+            //gfx_GetSprite(behind_shooter_sprite, shooter.x, shooter.y);
+            renderShooter(shooter);
+            //prev_shooter.x = shooter.x;
+            //prev_shooter.y = shooter.y;
 
-            if (prev_proj_visible) {
-               gfx_Sprite(behind_proj_sprite, prev_proj.x, prev_proj.y);
+            //if (prev_proj_visible) {
+            //    gfx_Sprite(behind_proj_sprite, prev_proj.x, prev_proj.y);
+            //}
+            if (shooter.flags & PROJ_HIT) { //show projectile for impact frame
+                shooter.projectile.visible = false;
+                shooter.flags &= ~PROJ_HIT;
             }
-
+            
             if (shooter.projectile.visible) {
-                gfx_GetSprite(behind_proj_sprite, shooter.projectile.x, shooter.projectile.y);
+                //gfx_GetSprite(behind_proj_sprite, shooter.projectile.x, shooter.projectile.y);
                 gfx_TransparentSprite(bubble_sprites[shooter.projectile.color], shooter.projectile.x, shooter.projectile.y);
                 prev_proj.x = shooter.projectile.x;
                 prev_proj.y = shooter.projectile.y;
@@ -801,8 +794,6 @@ void game(void) {
              gfx_PrintStringXY("Level", 0, 0);
              gfx_PrintUIntXY((int) level_number + 1, level_number_len, 48, 0);
              }*/
-            gfx_SetColor(255);
-            gfx_FillRectangle(0, 0, grid.x - 1, 64);
             gfx_PrintStringXY(level_type_text, 0, 0);
             if (current_game == LEVELS) {
                 gfx_PrintUIntXY((int) level_number + 1, level_number_len, 48, 0);
@@ -871,8 +862,6 @@ void game(void) {
         timer_Control = TIMER1_DISABLE;
         timer_1_Counter = 0;
         timer_Control = TIMER1_ENABLE | TIMER1_32K | TIMER1_UP;
-        gfx_SetColor(255);
-        gfx_FillRectangle(0, LCD_HEIGHT - 8, (sizeof(fps_string) - 1) * 8, 8);
         gfx_SetTextScale(1, 1);
         gfx_PrintStringXY(fps_string, 0, LCD_HEIGHT - 8);
         if (++fps_counter == 7) {

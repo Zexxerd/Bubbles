@@ -23,8 +23,6 @@
 #define RBOUND 64
 #define SHOOTER_STEP 4
 
-#define NEIGHBORS_SIZE 6
-
 #define matrixIndex(x, y, columns) ((y * columns) + x)
 #define getRangeIndex(angle, lower, step) ((angle - lower) / step)
 
@@ -56,6 +54,8 @@
 #define REDRAW_SHOOTER (1<<2)
 #define SHAKE (1<<3)
 #define PROJ_HIT (1<<4)
+
+
 
 //grid
 #define RENDER    (1<<0) // redraw grid
@@ -117,7 +117,7 @@ typedef struct grid {
     int x, y;  // left of level, top of level
     //uint8_t flags;
     //unsigned int score; //NOTE: create 48-bit type?
-    uint8_t ball_radius;
+    uint8_t ball_diameter;
     int width, height; //col * TILE_WIDTH, row * ROW_HEIGHT
     uint8_t cols;
     uint8_t rows;
@@ -141,7 +141,6 @@ typedef struct projectile {
 typedef struct shooter {
     int x,y; //this is the top left corner, add TILE_(WIDTH or HEIGHT)/2 for center
     int angle; // 0 is up, <0 is left, >0 is right
-    int prev_angle;
     projectile_t projectile; //may allow for multiple later
     uint8_t pal_index;
     uint8_t next_bubbles[3];
