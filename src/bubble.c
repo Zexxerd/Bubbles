@@ -9,8 +9,25 @@
 #include <keypadc.h>
 #include "bubble.h"
 
+
+#ifndef ANIM_POP_BEHIND_MAX
+#define ANIM_POP_BEHIND_MAX (ANIM_POOL_MAX >> 1) //animate up to 10 rows at once currently
+#endif
+
+#ifndef ANIM_FALL_BEHIND_MAX
+#define ANIM_FALL_BEHIND_MAX (ANIM_POOL_MAX >> 1) //animate up to 10 rows at once currently
+#endif
+
 #define deg(a) (a * (180 / M_PI))
 #define rad(a) (a * (M_PI / 180))
+
+#ifndef MAX_ROWS
+#define MAX_ROWS 17
+#endif
+
+#ifndef MAX_COLS
+#define MAX_COLS 7
+#endif
 
 #ifndef NEIGHBORS_SIZE
 #define NEIGHBORS_SIZE 6
@@ -32,12 +49,14 @@ char string[100];
 #endif
 
 bool pop_started; //handles initial condition
-point_t * pop_locations;
+point_t pop_locations[MAX_ROWS * MAX_COLS];
 bubble_list_t pop_cluster;
+bubble_t pop_cluster_bubbles[MAX_ROWS * MAX_COLS];
 uint8_t pop_counter;// timer for pop animation
 
 bool fall_started;
 falling_bubble_list_t fall_data;
+falling_bubble_t fall_data_bubbles[MAX_ROWS * MAX_COLS];
 int fall_total;
 uint8_t fall_counter;// timer for fall animation
 
@@ -508,12 +527,11 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
             if (game_flags & POP) { //animation already started, free bubbles to let it restart
                 pop_counter = 0;
                 pop_started = false;
-                free(pop_locations);
-                free(pop_cluster.bubbles);
             }
             game_flags |= POP; //pop animation starts
-            pop_cluster = copyBubbleList(cluster);
+            pop_cluster.size = cluster.size;
             for (i = 0; i < cluster.size; i++) {
+                pop_cluster.bubbles[i] = cluster.bubbles[i];
                 grid.bubbles[cluster.bubbles[i].y * grid.cols + cluster.bubbles[i].x].flags |= EMPTY;
             }
             if (game_flags & FALL) {
@@ -523,22 +541,24 @@ void snapBubble(shooter_t * shooter, grid_t grid) {
             fall_total = findFloatingClusters(grid);
             if (fall_total > 0) {
                 game_flags |= FALL;
-                fall_data.size = fall_total;
+                fall_data.size = fall_total > ANIM_FALL_BEHIND_MAX ? ANIM_FALL_BEHIND_MAX : fall_total;
                 for (i = 1; i < fall_total + 1; i++) {
                     player_score += 50 * i;
                 }
                 j = 0;
                 for (i = 0; i < grid.rows * grid.cols; i++) {
                     if (grid.bubbles[i].flags & FALLING) {
-                        gridpos = getTileCoordinate(grid.bubbles[i].x, grid.bubbles[i].y);
-                        fall_data.bubbles[j].x = gridpos.x + grid.x;
-                        fall_data.bubbles[j].y = gridpos.y + grid.y;
-                        fall_data.bubbles[j].velocity = randInt(-2, 2);
-                        fall_data.bubbles[j].color = grid.bubbles[i].color;
+                        if (j < fall_data.size) { //Get rid of falling bubbles that don't fit in the animation pool
+                            gridpos = getTileCoordinate(grid.bubbles[i].x, grid.bubbles[i].y);
+                            fall_data.bubbles[j].x = gridpos.x + grid.x;
+                            fall_data.bubbles[j].y = gridpos.y + grid.y;
+                            fall_data.bubbles[j].velocity = randInt(-2, 2);
+                            fall_data.bubbles[j].color = grid.bubbles[i].color;
+                            j++;
+                        }
                         grid.bubbles[i].flags |= EMPTY;
-                        j++;
+                        grid.bubbles[i].flags &= ~FALLING;
                     }
-                    grid.bubbles[i].flags &= ~FALLING;
                 }
             }
         } else {
