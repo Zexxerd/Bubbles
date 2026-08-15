@@ -39,6 +39,10 @@
 #ifndef MIN_ROWS
 #define MIN_ROWS 5
 #endif
+#ifndef MAX_COLS
+#define MAX_COLS 7
+#endif
+
 static char * printfloat(float elapsed) {
     real_t elapsed_real;
     static char str[10];
@@ -47,6 +51,32 @@ static char * printfloat(float elapsed) {
     return str;
 }
 
+int min(int a, int b) {
+    return a > b ? b : a;
+}
+
+uint8_t pop_behind_size;
+uint8_t fall_behind_size;
+static anim_behind_t pop_behind[ANIM_POP_BEHIND_MAX];
+static anim_behind_t fall_behind[ANIM_FALL_BEHIND_MAX];
+
+static void captureBehindSprite(anim_behind_t *behind, int x, int y) {
+    if (!behind->sprite) {
+        behind->sprite = gfx_MallocSprite(TILE_WIDTH, TILE_HEIGHT);
+        if (!behind->sprite) exit(1);
+    }
+    gfx_GetSprite(behind->sprite, x, y);
+    behind->pos.x = x;
+    behind->pos.y = y;
+    behind->valid = true;
+}
+
+static void restoreBehindSprite(anim_behind_t *behind) {
+    if (behind->valid && behind->sprite) {
+        gfx_Sprite(behind->sprite, behind->pos.x, behind->pos.y);
+        behind->valid = false;
+    }
+}
 
 extern uint8_t row_offset; // 0: even row shifted; 1: odd row shifted
 extern uint8_t max_color;
@@ -69,9 +99,6 @@ extern char option_strings[4][18];
 //Survival mode
 uint8_t auto_new_row_counter; //counts automatic new row shifts in survival mode
 
-
-
-
 #ifdef DEBUG
 extern bool debug_flag;
 #endif
@@ -83,10 +110,13 @@ extern const uint16_t bubble_colors[7];
 extern bool pop_started;
 extern point_t pop_locations[MAX_ROWS * MAX_COLS];
 extern bubble_list_t pop_cluster;
+extern bubble_t pop_cluster_bubbles[];
 extern uint8_t pop_counter; // timer for pop animation
 
 extern bool fall_started;
 extern falling_bubble_list_t fall_data;
+extern falling_bubble_t fall_data_bubbles[MAX_ROWS * MAX_COLS];
+
 extern int fall_total;
 extern uint8_t fall_counter;
 
@@ -143,7 +173,8 @@ void game(void) {
     //pop_sprite
     gfx_sprite_t * pop_sprite;
     gfx_sprite_t * pop_sprite_rotations[3];
-    //gfx_sprite_t * behind_pop_sprites;
+
+    gfx_sprite_t * behind_pop_sprites;
     
     bubble_list_t animation_list;
     gfx_sprite_t * lose_animation_behind;
@@ -200,6 +231,7 @@ void game(void) {
     grid_buffer = gfx_MallocSprite(grid.cols * TILE_WIDTH + (TILE_WIDTH>>1),ROW_HEIGHT * MAX_ROWS + (TILE_WIDTH>>2));
     if (grid_buffer == NULL) exit(1);
     game_flags = RENDER | NEW_LEVEL;
+    auto_new_row_counter = 0;
 
     srand(rtc_Time());
     available_colors = (uint8_t *) malloc((MAX_POSSIBLE_COLOR + 2) * sizeof(uint8_t));
@@ -207,6 +239,9 @@ void game(void) {
     initGrid(grid,grid.rows,grid.cols, 10, NULL);
     grid.possible_collisions = getPossibleCollisions(grid);
     
+    //pop_cluster
+    pop_cluster.bubbles = pop_cluster_bubbles;
+
     //popping animation sprites
     pop_counter = 0;
     pop_started = false;
@@ -218,11 +253,7 @@ void game(void) {
     //falling animation
     fall_counter = 0;
     fall_started = false;
-    fall_data.bubbles = (falling_bubble_t *) malloc(grid.cols * grid.rows * sizeof(falling_bubble_t));
-    if (fall_data.bubbles == NULL) {
-        debug_message("fall_data.bubbles alloc failed :O");
-        exit(1);
-    }
+    fall_data.bubbles = fall_data_bubbles;
     fall_data.size = 0;
     fall_total = 0;
 
@@ -238,6 +269,12 @@ void game(void) {
         exit(1);
     }
     prev_proj_visible = false;
+
+    pop_behind_size = 0;
+    fall_behind_size = 0;
+
+    memset(pop_behind, 0, ANIM_POP_BEHIND_MAX * sizeof(anim_behind_t));
+    memset(fall_behind, 0, ANIM_FALL_BEHIND_MAX * sizeof(anim_behind_t));
 
     game_status = RUNNING;
 
@@ -578,10 +615,22 @@ void game(void) {
                 pop_sprite_rotations[0] = gfx_FlipSpriteY(pop_sprite,pop_sprite_rotations[0]);
                 pop_sprite_rotations[1] = gfx_FlipSpriteX(pop_sprite,pop_sprite_rotations[1]);
                 pop_sprite_rotations[2] = gfx_FlipSpriteX(pop_sprite_rotations[0],pop_sprite_rotations[2]);
-                for (i = 0;i < pop_cluster.size;i++) {
+                pop_behind_size = min(pop_cluster.size, ANIM_POP_BEHIND_MAX);
+                for (i = 0;i < pop_behind_size; i++) {
                     point = getTileCoordinate(pop_cluster.bubbles[i].x,pop_cluster.bubbles[i].y);
                     pop_locations[i].x = point.x + grid.x;
                     pop_locations[i].y = point.y + grid.y;
+                    if (!pop_behind[i].valid) {
+                        if (!pop_behind[i].sprite) {
+                            pop_behind[i].sprite = gfx_MallocSprite(TILE_WIDTH, TILE_HEIGHT);
+                            if (pop_behind[i].sprite == NULL) {
+                                exit(1); //:(
+                            }
+                        }
+                        pop_behind[i].pos = pop_locations[i];
+                        pop_behind[i].img = ANIM_BUBBLE;
+                        pop_behind[i].valid = false;
+                    }
                 }
                 pop_started = true;
             }
@@ -590,6 +639,11 @@ void game(void) {
                 pop_counter = 0;
                 pop_started = false;
                 game_flags &= ~POP;
+                for (i = 0; i < ANIM_POP_BEHIND_MAX; i++) {
+                    if (pop_behind[i].valid) {
+                        restoreBehindSprite(&pop_behind[i]);
+                    }
+                }
                 pop_cluster.size = 0;
             }
         }
@@ -597,9 +651,22 @@ void game(void) {
             if (!fall_started) {
                 fall_counter = 0;
                 fall_started = true;
+                fall_behind_size = fall_data.size;
+                for (i = 0; i < fall_behind_size; i++) {
+                    if (!fall_behind[i].valid) {
+                        if (!fall_behind[i].sprite) {
+                            fall_behind[i].sprite = gfx_MallocSprite(TILE_WIDTH, TILE_HEIGHT);
+                            if (fall_behind[i].sprite == NULL) {
+                                exit(1); //>:((((
+                            }
+                        }
+                    }
+                    fall_behind[i].valid = false;
+                }
             }
             //Animate
             for (i = 0; i < fall_total; i++) {
+                restoreBehindSprite(&fall_behind[i]);
                 if (fall_data.bubbles[i].y < LCD_HEIGHT) {
                     fall_data.bubbles[i].x += (int8_t) fall_data.bubbles[i].velocity;
                     fall_data.bubbles[i].y += (fall_counter * 5) >> 2;
@@ -607,10 +674,8 @@ void game(void) {
             }
             fall_counter++;
             if (fall_counter == 25) {
-                fall_counter = 0;
                 fall_started = false;
                 game_flags &= ~FALL;
-                memset(fall_data.bubbles, 0, sizeof(falling_bubble_t) * fall_data.size);
             }
         }
         if (game_flags & CHECK) {
@@ -652,8 +717,10 @@ void game(void) {
                 switch (current_game) {
                     case SURVIVAL: //goal: add a 40000pt bonus message for clearing the board
                         player_score += 40000;
-                        auto_new_row_counter = 8;
-                        game_flags |= AUTO_FILL;
+                        if (!auto_new_row_counter) {
+                            auto_new_row_counter = 8;
+                            game_flags |= AUTO_FILL;
+                        }
                         setAvailableColors(available_colors, (1 << (max_color + 1)) - 1);
                          // force a grid shift
                         //addNewRow(&grid, grid.available_colors, 9);
@@ -758,18 +825,37 @@ void game(void) {
                 prev_proj_visible = false;
             }
 
-            if (pop_started) {
-                for (i = 0; i < pop_cluster.size; i++) { //animate
-                    if (pop_counter & 1) {
-                        drawTile(pop_cluster.bubbles[i].color, pop_locations[i].x, pop_locations[i].y);
+            if (pop_started) { //capture area behind popping bubbles
+                if (pop_counter & 1) {
+                    for (i = 0; i < pop_behind_size; i++) {
+                        if (pop_behind[i].img == ANIM_BUBBLE) {
+                            captureBehindSprite(&pop_behind[i], pop_locations[i].x, pop_locations[i].y);
+                        }
                     }
-                    else {
-                        //gfx_SetColor(255);
-                        //gfx_FillRectangle(pop_cluster.bubbles[i].x,pop_cluster.bubbles[i].y,TILE_WIDTH,TILE_HEIGHT);
+                }
+            }
+            if (fall_started) { //capture area behind falling bubbles
+                for (i = 0; i < fall_behind_size; i++) {
+                    captureBehindSprite(&fall_behind[i], fall_data.bubbles[i].x, fall_data.bubbles[i].y);
+                }
+            }
+            if (pop_started) {
+                for (i = 0; i < pop_behind_size; i++) { //animate
+                    switch (pop_behind[i].img) {
+                        case ANIM_BUBBLE:
+                            if (pop_counter & 1) {
+                                drawTile(pop_cluster.bubbles[i].color, pop_locations[i].x, pop_locations[i].y);
+                            } else {
+                                restoreBehindSprite(&pop_behind[i]);         
+                            }
+                            break;
+                        default:
+                            break;
                     }
                     point.x = pop_locations[i].x - pop_counter;
                     point.y = pop_locations[i].y - pop_counter;
-                    if (pop_counter & 2 || !pop_counter) {
+                    //disable pop particles for now
+                    /*if (pop_counter & 2 || !pop_counter) {
                         gfx_TransparentSprite(pop_sprite,point.x,point.y);
                         point.x = pop_locations[i].x + pop_counter + (TILE_WIDTH>>1);
                         gfx_TransparentSprite(pop_sprite_rotations[0],point.x,point.y);
@@ -777,13 +863,13 @@ void game(void) {
                         gfx_TransparentSprite(pop_sprite_rotations[2],point.x,point.y);
                         point.x = pop_locations[i].x - pop_counter;
                         gfx_TransparentSprite(pop_sprite_rotations[1],point.x,point.y);
-                    }
+                    }*/
                 }
             }
-            if (game_flags & FALL) {
-                for (i = 0; i < fall_total; i++) {
-                    j = fall_data.bubbles[i].y;
-                    if (j < LCD_HEIGHT) {
+            if (fall_started) {
+                for (i = 0; i < fall_data.size; i++) {
+                    if (fall_data.bubbles[i].y < LCD_HEIGHT) {
+                        captureBehindSprite(&fall_behind[i], fall_data.bubbles[i].x, fall_data.bubbles[i].y);
                         drawTile(fall_data.bubbles[i].color, fall_data.bubbles[i].x, fall_data.bubbles[i].y);
                     }
                 }
@@ -794,6 +880,13 @@ void game(void) {
              gfx_PrintStringXY("Level", 0, 0);
              gfx_PrintUIntXY((int) level_number + 1, level_number_len, 48, 0);
              }*/
+            gfx_SetColor(255);
+            #ifndef DEBUG
+            gfx_FillRectangle(0, 0, grid.x - 1, 64);
+            #endif
+            #ifdef DEBUG
+            gfx_FillRectangle(0, 0, grid.x - 1, 120);
+            #endif
             gfx_PrintStringXY(level_type_text, 0, 0);
             if (current_game == LEVELS) {
                 gfx_PrintUIntXY((int) level_number + 1, level_number_len, 48, 0);
@@ -815,6 +908,7 @@ void game(void) {
             gfx_PrintStringXY("Angle:", 0, 56);
             gfx_PrintIntXY(shooter.angle, 3, 74, 56);
             #ifdef DEBUG
+            gfx_FillRectangle(240, 0, 80, 16);
             gfx_PrintStringXY("Rows:", 240, 0);
             gfx_PrintIntXY(grid.rows, 3, 280, 0);
             gfx_PrintStringXY("Cols:", 240, 8);
@@ -932,13 +1026,18 @@ void game(void) {
     free(grid.bubbles);
     free(grid_buffer);
     free(available_colors);
-    free(fall_data.bubbles);
-    fall_data.bubbles = NULL;
     fall_data.size = fall_total = 0;
     for (i = 0; i < 3; i++) {
         free(pop_sprite_rotations[i]);
     }
-    if (pop_started) {
-        //free(pop_cluster.bubbles);
+    for (i = 0; i < ANIM_POP_BEHIND_MAX >> 1; i++) {
+        if (pop_behind[i].sprite) {
+            free(pop_behind[i].sprite);
+        }
+    }
+    for (i = 0; i < ANIM_FALL_BEHIND_MAX >> 1; i++) {
+        if (fall_behind[i].sprite) {
+            free(fall_behind[i].sprite);
+        }
     }
 }

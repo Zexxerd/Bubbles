@@ -66,6 +66,13 @@
 #define NEW_LEVEL (1<<5) // New level
 #define CHECK     (1<<6) // Check if bubbles have overflowed
 #define AUTO_FILL (1<<7) // Bubbles are being put in automatically
+
+//animation pool
+#define ANIM_POOL_MAX (MAX_COLS * 4 * 5)
+#define ANIM_POP_BEHIND_MAX (ANIM_POOL_MAX >> 1)
+#define ANIM_FALL_BEHIND_MAX (ANIM_POOL_MAX >> 1)
+
+
 /*debug macros*/
 #define gfx_PrintUIntXY(i,length,x,y) do { \
 gfx_SetTextXY(x,y);                         \
@@ -78,11 +85,12 @@ gfx_PrintInt(i,length);                      \
 
 //basic debug message
 #ifdef DEBUG
-#define debug_message(message)  \
-gfx_FillScreen(255);             \
-gfx_PrintStringXY(message,0,116); \
-gfx_BlitBuffer();                  \
-while (!os_GetCSC())
+#define debug_message(message) do { \
+gfx_FillScreen(255);                 \
+gfx_PrintStringXY(message,0,116);     \
+gfx_BlitBuffer();                      \
+while (!os_GetCSC());                   \
+} while (0)
 #else
 #define debug_message(message) do {} while (0)
 #endif
