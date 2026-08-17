@@ -844,6 +844,34 @@ void game(void) {
                 prev_proj_visible = false;
             }
 
+
+            if (pop_started) {
+                /*
+                If on an odd-frame, we display the flickering bubbles.
+                Otherwise we restore their behind_sprites so that
+                we can capture the right background image for the falling bubbles.*/
+                if (pop_counter & 1) {
+                    for (i = 0; i < pop_behind_size; i++) {
+                        switch (pop_behind[i].img) {
+                            case ANIM_BUBBLE:
+                                captureBehindSprite(&pop_behind[i], pop_locations[i].x, pop_locations[i].y);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                } else {
+                    for (i = 0; i < pop_behind_size; i++) {
+                        switch (pop_behind[i].img) {
+                            case ANIM_BUBBLE:
+                                restoreBehindSprite(&pop_behind[i]);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
             if (fall_started) { //capture area behind falling bubbles
                 for (i = 0; i < fall_behind_size; i++) {
                     captureBehindSprite(&fall_behind[i], fall_data.bubbles[i].x, fall_data.bubbles[i].y);
@@ -851,21 +879,11 @@ void game(void) {
             }
 
             if (pop_started) {
-                if (pop_counter & 1) {
-                    for (i = 0; i < pop_behind_size; i++) {
-                        switch (pop_behind[i].img) {
-                            case ANIM_BUBBLE:
-                                captureBehindSprite(&pop_behind[i], pop_locations[i].x, pop_locations[i].y);       
-                        }
-                    }
-                }
                 for (i = 0; i < pop_behind_size; i++) { //animate
                     switch (pop_behind[i].img) {
                         case ANIM_BUBBLE:
                             if (pop_counter & 1) {
                                 drawTile(pop_cluster.bubbles[i].color, pop_locations[i].x, pop_locations[i].y);
-                            } else {
-                                restoreBehindSprite(&pop_behind[i]);       
                             }
                             break;
                         default:
