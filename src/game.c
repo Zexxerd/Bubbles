@@ -221,7 +221,7 @@ void game(void) {
     grid.rows = MAX_ROWS;
     grid.x = centerX(((TILE_WIDTH * grid.cols) + (TILE_WIDTH >> 1)), LCD_WIDTH);
     grid.y = 0;
-    grid.ball_diameter = TILE_WIDTH;
+    grid.ball_diameter = TILE_WIDTH - 3; //TILE_WIDTH/2 is way too small, TILE_WIDTH can feel too big
     grid.width = (TILE_WIDTH * grid.cols) + (TILE_WIDTH>>1);
     grid.height = (ROW_HEIGHT * grid.rows) + (TILE_WIDTH>>2);
     grid.bubbles = (bubble_t *) malloc((grid.cols*grid.rows) * sizeof(bubble_t));
@@ -634,15 +634,12 @@ void game(void) {
                 }
                 pop_started = true;
             }
-            pop_counter++;
             if (pop_counter == 20) {
                 pop_counter = 0;
                 pop_started = false;
                 game_flags &= ~POP;
                 for (i = 0; i < ANIM_POP_BEHIND_MAX; i++) {
-                    if (pop_behind[i].valid) {
-                        restoreBehindSprite(&pop_behind[i]);
-                    }
+                    restoreBehindSprite(&pop_behind[i]);
                 }
                 pop_cluster.size = 0;
             }
@@ -791,10 +788,32 @@ void game(void) {
             if (game_flags & RENDER) {
                 renderGrid(grid, grid_buffer);
                 game_flags &= ~RENDER;
+                if (grid.y) {
+                    gfx_SetColor(255); //WHITE
+                    gfx_FillRectangle(grid.x, 0, grid.width, grid.y);
+                }
+                gfx_TransparentSprite(grid_buffer, grid.x, grid.y);
+                if (pop_started) { //capture area behind popping bubbles
+                    for (i = 0; i < pop_behind_size; i++) {
+                        if (pop_behind[i].img == ANIM_BUBBLE) {
+                            captureBehindSprite(&pop_behind[i], pop_locations[i].x, pop_locations[i].y);
+                        }
+                    }
+                }
+                if (fall_started) { //capture area behind falling bubbles
+                    for (i = 0; i < fall_behind_size; i++) {
+                        captureBehindSprite(&fall_behind[i], fall_data.bubbles[i].x, fall_data.bubbles[i].y);
+                    }
+                }
+                if (prev_proj_visible) {
+                    gfx_GetSprite(behind_proj_sprite, prev_proj.x, prev_proj.y);
+                }
+
             }
-            gfx_FillScreen(255);
-            //draw grid
-            gfx_TransparentSprite(grid_buffer, grid.x, grid.y);
+            if (shooter.flags & PROJ_HIT) { //show projectile for impact frame
+                shooter.projectile.visible = false;
+                shooter.flags &= ~PROJ_HIT;
+            }
 
             gfx_SetColor(0); //BLACK
             gfx_Rectangle(grid.x, grid.y, grid.width, grid.height - ROW_HEIGHT);
@@ -825,28 +844,28 @@ void game(void) {
                 prev_proj_visible = false;
             }
 
-            if (pop_started) { //capture area behind popping bubbles
-                if (pop_counter & 1) {
-                    for (i = 0; i < pop_behind_size; i++) {
-                        if (pop_behind[i].img == ANIM_BUBBLE) {
-                            captureBehindSprite(&pop_behind[i], pop_locations[i].x, pop_locations[i].y);
-                        }
-                    }
-                }
-            }
             if (fall_started) { //capture area behind falling bubbles
                 for (i = 0; i < fall_behind_size; i++) {
                     captureBehindSprite(&fall_behind[i], fall_data.bubbles[i].x, fall_data.bubbles[i].y);
                 }
             }
+
             if (pop_started) {
+                if (pop_counter & 1) {
+                    for (i = 0; i < pop_behind_size; i++) {
+                        switch (pop_behind[i].img) {
+                            case ANIM_BUBBLE:
+                                captureBehindSprite(&pop_behind[i], pop_locations[i].x, pop_locations[i].y);       
+                        }
+                    }
+                }
                 for (i = 0; i < pop_behind_size; i++) { //animate
                     switch (pop_behind[i].img) {
                         case ANIM_BUBBLE:
                             if (pop_counter & 1) {
                                 drawTile(pop_cluster.bubbles[i].color, pop_locations[i].x, pop_locations[i].y);
                             } else {
-                                restoreBehindSprite(&pop_behind[i]);         
+                                restoreBehindSprite(&pop_behind[i]);       
                             }
                             break;
                         default:
@@ -865,11 +884,11 @@ void game(void) {
                         gfx_TransparentSprite(pop_sprite_rotations[1],point.x,point.y);
                     }*/
                 }
+                pop_counter++;
             }
             if (fall_started) {
                 for (i = 0; i < fall_data.size; i++) {
                     if (fall_data.bubbles[i].y < LCD_HEIGHT) {
-                        captureBehindSprite(&fall_behind[i], fall_data.bubbles[i].x, fall_data.bubbles[i].y);
                         drawTile(fall_data.bubbles[i].color, fall_data.bubbles[i].x, fall_data.bubbles[i].y);
                     }
                 }
