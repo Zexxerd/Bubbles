@@ -117,6 +117,8 @@ extern falling_bubble_t fall_data_bubbles[MAX_ROWS * MAX_COLS];
 extern int fall_total;
 extern uint8_t fall_counter;
 
+//key presses
+
 extern bool kb_2nd_press, kb_2nd_prev;
 extern bool kb_clear_press, kb_clear_prev;
 extern bool kb_up_press, kb_up_prev;
@@ -142,6 +144,8 @@ void game(void) {
     bubble_t debug_bubble;
     bubble_list_t neighbors;
     bubble_list_t foundcluster;
+    bool kb_comma_press;
+    bool kb_comma_prev;
     bool move_bubble_grid;
     //debugTestOutput();
     //debugTestRead();
@@ -166,7 +170,6 @@ void game(void) {
 
     point_t prev_shooter = {-1, -1};
     point_t prev_proj = {-1, -1};
-    //key presses
 
     //pop_sprite
     gfx_sprite_t * pop_sprite;
@@ -267,7 +270,6 @@ void game(void) {
         exit(1);
     }
     prev_proj_visible = false;
-    shooter_dirty = false;
 
     pop_behind_size = 0;
     fall_behind_size = 0;
@@ -285,6 +287,7 @@ void game(void) {
     x = y = 0;
     highlight_timer = 0;
     move_bubble_grid = false;
+    kb_comma_press = kb_comma_prev = false;
 #endif
     gfx_FillScreen(255);
     /*Initialize timer*/ 
@@ -311,6 +314,10 @@ void game(void) {
         kb_down_prev = kb_down_press;
         kb_down_press = kb_Data[7] & kb_Down;
         
+        #ifdef DEBUG
+        kb_comma_prev = kb_comma_press;
+        kb_comma_press = kb_Data[3] & kb_Comma;
+        #endif
         //gfx_FillScreen(255);  //Goal: change render method to partial
         if (game_flags & NEW_LEVEL) {
             if (!level_start_finished) {
@@ -601,10 +608,10 @@ void game(void) {
         if (kb_Data[2] & kb_Square) {
             shooter.flags ^= DEACTIVATED;
         }
-        if (kb_Data[3] & kb_Comma) {
-            move_bubble_grid = false;
-        } else {
-            move_bubble_grid = true;
+        if (single_press(kb_comma_press, kb_comma_prev)) {
+            move_bubble_grid = !move_bubble_grid;
+            dbg_printf("move_bubble_grid =");
+            dbg_printf(move_bubble_grid ? "true\n" : "false\n");
         }
 #endif //DEBUG
         if (game_flags & POP) {
@@ -950,12 +957,14 @@ void game(void) {
 #ifdef DEBUG
             /*Draw a highlight for the highlighted square*/
             if ((highlight_timer-1) & 1) {
-                gfx_SetColor(5);
+                gfx_SetColor(highlight_timer % 6);
                 debug_point = getTileCoordinate(x,y);
                 gfx_FillRectangle(grid.x+debug_point.x,grid.y+debug_point.y,TILE_WIDTH,TILE_HEIGHT);
                 drawTile(grid.bubbles[y * grid.cols + x].color,grid.x+debug_point.x,grid.y+debug_point.y);
             }
             highlight_timer++;
+            gfx_SetColor(255);
+            gfx_FillRectangle(0, LCD_HEIGHT-24, 36, 16);
             gfx_PrintStringXY("X:",0,LCD_HEIGHT-24);
             gfx_PrintStringXY("Y:",0,LCD_HEIGHT-16);
             gfx_PrintUIntXY(x,2,20,LCD_HEIGHT-24);
